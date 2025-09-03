@@ -9,10 +9,19 @@
   <link rel="stylesheet" href="Order.css">
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" rel="noopener noreferrer">
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" rel="noopener noreferrer">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-  <div class="header">
-    <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+  <header class="header">
+    <button class="menu-toggle" onclick="toggleMenu()">
+      <i class="fas fa-bars"></i>
+    </button>
+    
+    <div class="logo">
+      <i class="fas fa-coffee" style="color: #fff; font-size: 1.8rem;"></i>
+      <span>TocoToco</span>
+    </div>
+
     <div class="user-info" id="user-info" style="display: none;">
       <div class="user-name">
         <span id="user-name-display"></span>
@@ -23,23 +32,49 @@
         <div class="exp-bar"><div class="exp-fill" id="exp-fill" style="width: 0%"></div></div>
       </div>
     </div>
-    <div id="auth-control">
-      <button onclick="showLoginPopup(false)" id="login-button">Đăng nhập</button>
-      <button onclick="showLoginPopup(true)" id="register-button">Đăng ký</button>
-      <button onclick="logout()" id="logout-button" style="display: none;">Đăng xuất</button>
+
+    <div class="header-actions">
+      <div id="auth-control">
+        <button onclick="showLoginPopup(false)" id="login-button" class="btn btn-outline">
+          <i class="fas fa-sign-in-alt"></i> Đăng nhập
+        </button>
+        <button onclick="showLoginPopup(true)" id="register-button" class="btn btn-primary">
+          <i class="fas fa-user-plus"></i> Đăng ký
+        </button>
+        <button onclick="logout()" id="logout-button" class="btn btn-outline" style="display: none;">
+          <i class="fas fa-sign-out-alt"></i> Đăng xuất
+        </button>
+      </div>
+      
+      <button class="cart-btn" onclick="viewCart()">
+        <i class="fas fa-shopping-cart"></i>
+        <span id="cart-count-header">0</span>
+      </button>
     </div>
-  </div>
+  </header>
   <div class="container">
-    <div class="sidebar" id="sidebar">
-      <div>
-        <h3>Danh Mục</h3>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3><i class="fas fa-list"></i> Danh Mục</h3>
+      </div>
+      <div class="sidebar-content">
         <ul id="category-list"></ul>
       </div>
       <div class="cart" onclick="viewCart()">
+        <i class="fas fa-shopping-cart"></i>
         Giỏ hàng (<span id="cart-count">0</span>)
       </div>
-    </div>
-    <div class="content" id="product-list"></div>
+    </aside>
+    
+    <main class="content">
+      <div class="content-header">
+        <h2 id="category-title">Sản phẩm nổi bật</h2>
+        <div class="search-container">
+          <input type="text" id="product-search" placeholder="Tìm kiếm sản phẩm...">
+        </div>
+      </div>
+      <div class="product-grid" id="product-list"></div>
+    </main>
   </div>
 
   <!-- Popup chọn tùy chọn -->
