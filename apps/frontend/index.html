@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PetMarket Vietnam - Thú Cưng Tại Nhà</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Kết nối những người yêu thú cưng trên toàn quốc. Mua bán thú cưng uy tín, an toàn với hệ thống đánh giá và bảo vệ người dùng.">
+    <meta name="keywords" content="thú cưng, mua bán thú cưng, chó mèo, cá cảnh, chim cảnh, Vietnam pets">
+    <meta name="author" content="PetMarket Vietnam">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="PetMarket Vietnam - Thú Cưng Tại Nhà">
+    <meta property="og:description" content="Kết nối những người yêu thú cưng trên toàn quốc. Mua bán thú cưng uy tín, an toàn.">
+    <meta property="og:image" content="/assets/img/brand/og-image.jpg">
+    <meta property="og:url" content="https://petmarket.vn">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="PetMarket Vietnam">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="PetMarket Vietnam - Thú Cưng Tại Nhà">
+    <meta name="twitter:description" content="Kết nối những người yêu thú cưng trên toàn quốc">
+    <meta name="twitter:image" content="/assets/img/brand/twitter-card.jpg">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/assets/img/brand/favicon.svg">
+    <link rel="icon" type="image/png" href="/assets/img/brand/favicon.png">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/apps/frontend/assets/css/styles.css">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "PetMarket Vietnam",
+        "url": "https://petmarket.vn",
+        "logo": "https://petmarket.vn/assets/img/brand/logo.svg",
+        "description": "Kết nối những người yêu thú cưng trên toàn quốc",
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": "+84-xxx-xxx-xxx",
+            "contactType": "customer service"
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <!-- Logo -->
+                <div class="logo">
+                    <a href="/apps/frontend/index.html" class="logo-link">
+                        <i class="fas fa-paw logo-icon"></i>
+                        <span class="logo-text">PetMarket</span>
+                    </a>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="search-container">
+                    <div class="search-bar">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="global-search" placeholder="Tìm kiếm thú cưng..." class="search-input">
+                        <button type="button" class="search-btn">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <div class="search-suggestions" id="search-suggestions"></div>
+                </div>
+                
+                <!-- Navigation -->
+                <nav class="nav-primary">
+                    <a href="/apps/frontend/buyer.html" class="nav-link">
+                        <i class="fas fa-heart"></i>
+                        <span data-i18n="nav.browse">Duyệt thú cưng</span>
+                    </a>
+                    <a href="/apps/frontend/seller.html" class="nav-link">
+                        <i class="fas fa-plus-circle"></i>
+                        <span data-i18n="nav.sell">Đăng tin</span>
+                    </a>
+                </nav>
+                
+                <!-- User Actions -->
+                <div class="user-actions">
+                    <!-- Theme Toggle -->
+                    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    
+                    <!-- Language Toggle -->
+                    <button class="lang-toggle" id="lang-toggle" aria-label="Change language">
+                        <i class="fas fa-globe"></i>
+                        <span id="current-lang">VI</span>
+                    </button>
+                    
+                    <!-- Auth Buttons -->
+                    <div class="auth-buttons" id="auth-buttons">
+                        <button class="btn btn-outline" id="login-btn" data-i18n="auth.login">Đăng nhập</button>
+                        <button class="btn btn-primary" id="register-btn" data-i18n="auth.register">Đăng ký</button>
+                    </div>
+                    
+                    <!-- User Menu (hidden by default) -->
+                    <div class="user-menu" id="user-menu" style="display: none;">
+                        <button class="user-avatar" id="user-avatar">
+                            <img src="" alt="User Avatar" id="user-avatar-img">
+                            <span id="user-name"></span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="user-dropdown">
+                            <a href="#" class="dropdown-item" id="profile-link">
+                                <i class="fas fa-user"></i>
+                                <span data-i18n="user.profile">Hồ sơ</span>
+                            </a>
+                            <a href="#" class="dropdown-item" id="orders-link">
+                                <i class="fas fa-shopping-bag"></i>
+                                <span data-i18n="user.orders">Đơn hàng</span>
+                            </a>
+                            <a href="#" class="dropdown-item" id="favorites-link">
+                                <i class="fas fa-heart"></i>
+                                <span data-i18n="user.favorites">Yêu thích</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item" id="logout-btn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span data-i18n="auth.logout">Đăng xuất</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mobile Menu Toggle -->
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle mobile menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div class="mobile-menu" id="mobile-menu">
+            <div class="mobile-search">
+                <div class="search-bar">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" placeholder="Tìm kiếm thú cưng..." class="search-input">
+                </div>
+            </div>
+            <nav class="mobile-nav">
+                <a href="/apps/frontend/buyer.html" class="mobile-nav-link">
+                    <i class="fas fa-heart"></i>
+                    <span data-i18n="nav.browse">Duyệt thú cưng</span>
+                </a>
+                <a href="/apps/frontend/seller.html" class="mobile-nav-link">
+                    <i class="fas fa-plus-circle"></i>
+                    <span data-i18n="nav.sell">Đăng tin</span>
+                </a>
+                <a href="/apps/frontend/support.html" class="mobile-nav-link">
+                    <i class="fas fa-headset"></i>
+                    <span data-i18n="nav.support">Hỗ trợ</span>
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-background">
+                <div class="hero-overlay"></div>
+            </div>
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-text">
+                        <h1 class="hero-title" data-i18n="hero.title">
+                            Kết nối những người yêu <span class="highlight">thú cưng</span>
+                        </h1>
+                        <p class="hero-subtitle" data-i18n="hero.subtitle">
+                            Tìm kiếm người bạn đồng hành lý tưởng cho gia đình bạn. 
+                            Mua bán thú cưng uy tín, an toàn với hệ thống đánh giá và bảo vệ người dùng.
+                        </p>
+                        <div class="hero-actions">
+                            <a href="/apps/frontend/buyer.html" class="btn btn-primary btn-large">
+                                <i class="fas fa-search"></i>
+                                <span data-i18n="hero.browse">Tìm thú cưng</span>
+                            </a>
+                            <a href="/apps/frontend/seller.html" class="btn btn-outline btn-large">
+                                <i class="fas fa-plus"></i>
+                                <span data-i18n="hero.sell">Đăng tin bán</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="hero-image">
+                        <img src="https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=600&h=400&fit=crop" 
+                             alt="Happy pets and families" class="hero-img">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Featured Categories -->
+        <section class="categories">
+            <div class="container">
+                <h2 class="section-title" data-i18n="categories.title">Danh mục phổ biến</h2>
+                <div class="categories-grid">
+                    <a href="/apps/frontend/buyer.html?species=dog" class="category-card">
+                        <div class="category-icon">
+                            <i class="fas fa-dog"></i>
+                        </div>
+                        <h3 class="category-name" data-i18n="categories.dogs">Chó</h3>
+                        <p class="category-count">2,450+ tin đăng</p>
+                    </a>
+                    <a href="/apps/frontend/buyer.html?species=cat" class="category-card">
+                        <div class="category-icon">
+                            <i class="fas fa-cat"></i>
+                        </div>
+                        <h3 class="category-name" data-i18n="categories.cats">Mèo</h3>
+                        <p class="category-count">1,820+ tin đăng</p>
+                    </a>
+                    <a href="/apps/frontend/buyer.html?species=bird" class="category-card">
+                        <div class="category-icon">
+                            <i class="fas fa-dove"></i>
+                        </div>
+                        <h3 class="category-name" data-i18n="categories.birds">Chim</h3>
+                        <p class="category-count">980+ tin đăng</p>
+                    </a>
+                    <a href="/apps/frontend/buyer.html?species=fish" class="category-card">
+                        <div class="category-icon">
+                            <i class="fas fa-fish"></i>
+                        </div>
+                        <h3 class="category-name" data-i18n="categories.fish">Cá</h3>
+                        <p class="category-count">650+ tin đăng</p>
+                    </a>
+                    <a href="/apps/frontend/buyer.html?species=rabbit" class="category-card">
+                        <div class="category-icon">
+                            <i class="fas fa-rabbit"></i>
+                        </div>
+                        <h3 class="category-name" data-i18n="categories.rabbits">Thỏ</h3>
+                        <p class="category-count">320+ tin đăng</p>
+                    </a>
+                    <a href="/apps/frontend/buyer.html?species=other" class="category-card">
+                        <div class="category-icon">
+                            <i class="fas fa-paw"></i>
+                        </div>
+                        <h3 class="category-name" data-i18n="categories.others">Khác</h3>
+                        <p class="category-count">180+ tin đăng</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works -->
+        <section class="how-it-works">
+            <div class="container">
+                <h2 class="section-title" data-i18n="how.title">Cách mua bán an toàn</h2>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <div class="step-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <h3 class="step-title" data-i18n="how.step1.title">Tìm kiếm</h3>
+                        <p class="step-description" data-i18n="how.step1.desc">
+                            Duyệt qua hàng ngàn tin đăng thú cưng được xác minh. 
+                            Lọc theo loài, giá cả, và vị trí gần bạn.
+                        </p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <div class="step-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h3 class="step-title" data-i18n="how.step2.title">Liên hệ</h3>
+                        <p class="step-description" data-i18n="how.step2.desc">
+                            Nhắn tin trực tiếp với người bán qua hệ thống chat bảo mật. 
+                            Hỏi về tình trạng sức khỏe và xem thêm ảnh.
+                        </p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <div class="step-icon">
+                            <i class="fas fa-handshake"></i>
+                        </div>
+                        <h3 class="step-title" data-i18n="how.step3.title">Gặp mặt</h3>
+                        <p class="step-description" data-i18n="how.step3.desc">
+                            Hẹn gặp tại nơi công cộng an toàn. 
+                            Kiểm tra sức khỏe thú cưng trước khi thanh toán.
+                        </p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">4</div>
+                        <div class="step-icon">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <h3 class="step-title" data-i18n="how.step4.title">Đánh giá</h3>
+                        <p class="step-description" data-i18n="how.step4.desc">
+                            Để lại đánh giá để giúp cộng đồng. 
+                            Xây dựng uy tín cho những giao dịch tiếp theo.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Statistics -->
+        <section class="stats">
+            <div class="container">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number">50,000+</div>
+                            <div class="stat-label" data-i18n="stats.users">Thành viên</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-heart"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number">15,000+</div>
+                            <div class="stat-label" data-i18n="stats.pets">Thú cưng</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-handshake"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number">30,000+</div>
+                            <div class="stat-label" data-i18n="stats.transactions">Giao dịch</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number">63</div>
+                            <div class="stat-label" data-i18n="stats.provinces">Tỉnh thành</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Featured Pets -->
+        <section class="featured-pets">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title" data-i18n="featured.title">Thú cưng nổi bật</h2>
+                    <a href="/apps/frontend/buyer.html" class="section-link" data-i18n="featured.viewAll">
+                        Xem tất cả
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                <div class="pets-grid" id="featured-pets-grid">
+                    <!-- Featured pets will be loaded dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Testimonials -->
+        <section class="testimonials">
+            <div class="container">
+                <h2 class="section-title" data-i18n="testimonials.title">Người dùng nói gì</h2>
+                <div class="testimonials-grid">
+                    <div class="testimonial-card">
+                        <div class="testimonial-content">
+                            <p class="testimonial-text">
+                                "Tôi đã tìm được chú chó Golden Retriever hoàn hảo cho gia đình. 
+                                Hệ thống đánh giá giúp tôi tin tưởng người bán."
+                            </p>
+                        </div>
+                        <div class="testimonial-author">
+                            <img src="https://images.unsplash.com/photo-1494790108755-2616b612b287?w=60&h=60&fit=crop&crop=face" 
+                                 alt="Nguyễn Thị Lan" class="author-avatar">
+                            <div class="author-info">
+                                <div class="author-name">Nguyễn Thị Lan</div>
+                                <div class="author-location">TP.HCM</div>
+                            </div>
+                        </div>
+                        <div class="testimonial-rating">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="testimonial-card">
+                        <div class="testimonial-content">
+                            <p class="testimonial-text">
+                                "Là người bán, tôi rất hài lòng với tính năng chat và hệ thống bảo vệ. 
+                                Đã bán được nhiều bé mèo trong thời gian ngắn."
+                            </p>
+                        </div>
+                        <div class="testimonial-author">
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=60&h=60&fit=crop&crop=face" 
+                                 alt="Trần Văn Minh" class="author-avatar">
+                            <div class="author-info">
+                                <div class="author-name">Trần Văn Minh</div>
+                                <div class="author-location">Hà Nội</div>
+                            </div>
+                        </div>
+                        <div class="testimonial-rating">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="testimonial-card">
+                        <div class="testimonial-content">
+                            <p class="testimonial-text">
+                                "Support team rất nhiệt tình hỗ trợ khi tôi gặp vấn đề. 
+                                Cảm thấy an tâm khi giao dịch qua platform này."
+                            </p>
+                        </div>
+                        <div class="testimonial-author">
+                            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60&h=60&fit=crop&crop=face" 
+                                 alt="Lê Thị Hương" class="author-avatar">
+                            <div class="author-info">
+                                <div class="author-name">Lê Thị Hương</div>
+                                <div class="author-location">Đà Nẵng</div>
+                            </div>
+                        </div>
+                        <div class="testimonial-rating">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <i class="fas fa-paw logo-icon"></i>
+                        <span class="logo-text">PetMarket</span>
+                    </div>
+                    <p class="footer-description">
+                        Kết nối những người yêu thú cưng trên toàn quốc. 
+                        Mua bán thú cưng uy tín, an toàn.
+                    </p>
+                    <div class="social-links">
+                        <a href="#" class="social-link" aria-label="Facebook">
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                        <a href="#" class="social-link" aria-label="Instagram">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="#" class="social-link" aria-label="YouTube">
+                            <i class="fab fa-youtube"></i>
+                        </a>
+                        <a href="#" class="social-link" aria-label="TikTok">
+                            <i class="fab fa-tiktok"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="footer-section">
+                    <h3 class="footer-title" data-i18n="footer.marketplace">Thị trường</h3>
+                    <ul class="footer-links">
+                        <li><a href="/apps/frontend/buyer.html?species=dog" data-i18n="categories.dogs">Chó</a></li>
+                        <li><a href="/apps/frontend/buyer.html?species=cat" data-i18n="categories.cats">Mèo</a></li>
+                        <li><a href="/apps/frontend/buyer.html?species=bird" data-i18n="categories.birds">Chim</a></li>
+                        <li><a href="/apps/frontend/buyer.html?species=fish" data-i18n="categories.fish">Cá</a></li>
+                        <li><a href="/apps/frontend/buyer.html" data-i18n="footer.all">Tất cả thú cưng</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h3 class="footer-title" data-i18n="footer.support">Hỗ trợ</h3>
+                    <ul class="footer-links">
+                        <li><a href="/apps/frontend/support.html" data-i18n="footer.help">Trung tâm trợ giúp</a></li>
+                        <li><a href="#" data-i18n="footer.safety">An toàn giao dịch</a></li>
+                        <li><a href="#" data-i18n="footer.guidelines">Hướng dẫn đăng tin</a></li>
+                        <li><a href="#" data-i18n="footer.contact">Liên hệ</a></li>
+                        <li><a href="#" data-i18n="footer.report">Báo cáo vi phạm</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h3 class="footer-title" data-i18n="footer.legal">Pháp lý</h3>
+                    <ul class="footer-links">
+                        <li><a href="#" data-i18n="footer.terms">Điều khoản sử dụng</a></li>
+                        <li><a href="#" data-i18n="footer.privacy">Chính sách bảo mật</a></li>
+                        <li><a href="#" data-i18n="footer.cookies">Chính sách Cookie</a></li>
+                        <li><a href="#" data-i18n="footer.community">Quy tắc cộng đồng</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <div class="footer-bottom-content">
+                    <p class="copyright">
+                        © 2024 PetMarket Vietnam. <span data-i18n="footer.rights">Tất cả quyền được bảo lưu.</span>
+                    </p>
+                    <div class="footer-bottom-links">
+                        <span class="language-info">
+                            <i class="fas fa-globe"></i>
+                            <span id="footer-lang">Tiếng Việt</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="auth-modal-title">Đăng nhập</h2>
+                <button class="modal-close" id="auth-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Login Form -->
+                <form id="login-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Mật khẩu</label>
+                        <input type="password" id="login-password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Đăng nhập</button>
+                </form>
+                
+                <!-- Register Form -->
+                <form id="register-form" class="auth-form" style="display: none;">
+                    <div class="form-group">
+                        <label for="register-name">Họ và tên</label>
+                        <input type="text" id="register-name" name="fullName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-phone">Số điện thoại</label>
+                        <input type="tel" id="register-phone" name="phone">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Mật khẩu</label>
+                        <input type="password" id="register-password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-role">Vai trò</label>
+                        <select id="register-role" name="role">
+                            <option value="buyer">Người mua</option>
+                            <option value="seller">Người bán</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Đăng ký</button>
+                </form>
+                
+                <div class="auth-switch">
+                    <p id="auth-switch-text">
+                        Chưa có tài khoản? 
+                        <button type="button" id="auth-switch-btn" class="link-btn">Đăng ký ngay</button>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/apps/frontend/assets/js/utils.js"></script>
+    <script src="/apps/frontend/assets/js/i18n.js"></script>
+    <script src="/apps/frontend/assets/js/api.js"></script>
+    <script src="/apps/frontend/assets/js/auth.js"></script>
+    <script src="/apps/frontend/assets/js/pets.js"></script>
+    <script src="/apps/frontend/assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+name = "pet-market"
+main = "apps/backend/worker.js"
+compatibility_date = "2024-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables
+[vars]
+JWT_SECRET = "your-super-secret-jwt-key-change-in-production-min-32-chars"
+ALLOWED_ORIGIN = "http://localhost:8080"
+DEV = "true"
+R2_PUBLIC_BASE = "https://pet-images.your-domain.com"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "PET_DB"
+database_name = "pet_market_db"
+database_id = "your-d1-database-id-here"
+migrations_dir = "apps/backend/migrations"
+
+# R2 Storage binding for pet images
+[[r2_buckets]]
+binding = "PET_IMAGES"
+bucket_name = "pet-images"
+
+# KV Storage for sessions (optional - can use D1 sessions table instead)
+[[kv_namespaces]]
+binding = "SESSIONS_KV"
+id = "your-sessions-kv-id-here"
+preview_id = "your-sessions-kv-preview-id-here"
+
+# KV Storage for rate limiting
+[[kv_namespaces]]
+binding = "RATELIMIT_KV"
+id = "your-ratelimit-kv-id-here"
+preview_id = "your-ratelimit-kv-preview-id-here"
+
+# Build configuration
+[build]
+command = ""
+
+# Development configuration
+[env.development.vars]
+DEV = "true"
+ALLOWED_ORIGIN = "http://localhost:8080"
+R2_PUBLIC_BASE = "http://localhost:8787"
+
+# Production configuration
+[env.production.vars]
+DEV = "false"
+ALLOWED_ORIGIN = "https://your-production-domain.com"
+R2_PUBLIC_BASE = "https://cdn.your-production-domain.com"
+JWT_SECRET = "production-jwt-secret-very-long-and-secure"
+
+# Limits and resource allocation
+[limits]
+cpu_ms = 100
+
+# Cron triggers for cleanup tasks
+[[triggers]]
+crons = ["0 2 * * *"] # Daily at 2 AM
+[[triggers]]
+crons = ["0 */6 * * *"] # Every 6 hours
+
+# Routes for custom domain (optional)
+# routes = [
+#   { pattern = "api.your-domain.com/*", zone_name = "your-domain.com" }
+# ]
+
+# Analytics and monitoring
+[analytics_engine_datasets]
+binding = "PET_ANALYTICS"
+
+# Configuration for different environments
+[env.staging]
+name = "pet-market-staging"
+
+[env.staging.vars]
+DEV = "false"
+ALLOWED_ORIGIN = "https://staging.your-domain.com"
+R2_PUBLIC_BASE = "https://staging-cdn.your-domain.com"
+
+# D1 database for staging
+[[env.staging.d1_databases]]
+binding = "PET_DB"
+database_name = "pet_market_staging_db"
+database_id = "your-staging-d1-database-id"
+
+# R2 bucket for staging
+[[env.staging.r2_buckets]]
+binding = "PET_IMAGES"
+bucket_name = "pet-images-staging"
+
+# Staging KV namespaces
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS_KV"
+id = "your-staging-sessions-kv-id"
+
+[[env.staging.kv_namespaces]]
+binding = "RATELIMIT_KV"
+id = "your-staging-ratelimit-kv-id"
