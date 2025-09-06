@@ -16,13 +16,13 @@ const LANGUAGES = {
     name: 'Tiếng Việt',
     code: 'vi',
     flag: '🇻🇳',
-    file: '/apps/frontend/assets/i18n/vi.json'
+    file: 'assets/i18n/vi.json'
   },
   en: {
     name: 'English',
     code: 'en',
     flag: '🇺🇸',
-    file: '/apps/frontend/assets/i18n/en.json'
+    file: 'assets/i18n/en.json'
   }
 };
 

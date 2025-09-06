@@ -214,21 +214,21 @@ const updateNavigationByRole = (role) => {
   if (profileLink) {
     switch (role) {
       case 'seller':
-        profileLink.href = '/apps/frontend/seller.html';
+        profileLink.href = '#seller';
         break;
       case 'admin':
-        profileLink.href = '/apps/frontend/admin.html';
+        profileLink.href = '#admin';
         break;
       case 'support':
-        profileLink.href = '/apps/frontend/support.html';
+        profileLink.href = '#support';
         break;
       default:
-        profileLink.href = '/apps/frontend/buyer.html';
+        profileLink.href = '#buyer';
     }
   }
   
   if (ordersLink) {
-    ordersLink.href = role === 'seller' ? '/apps/frontend/seller.html#orders' : '/apps/frontend/buyer.html#orders';
+    ordersLink.href = role === 'seller' ? '#seller' : '#buyer';
   }
 };
 
@@ -367,7 +367,7 @@ const showSearchSuggestions = (pets) => {
   if (!searchSuggestions) return;
   
   const suggestionHTML = pets.map(pet => `
-    <a href="/apps/frontend/buyer.html?pet=${pet.slug}" class="suggestion-item">
+    <a href="#buyer" onclick="showPetDetails('${pet.slug}')" class="suggestion-item">
       <img src="${pet.photos[0] || 'https://via.placeholder.com/40'}" alt="${pet.title}" class="suggestion-image">
       <div class="suggestion-content">
         <div class="suggestion-title">${pet.title}</div>
@@ -390,7 +390,12 @@ const showSearchSuggestions = (pets) => {
 // Redirect to search page
 const redirectToSearch = (query) => {
   if (query) {
-    window.location.href = `/apps/frontend/buyer.html?search=${encodeURIComponent(query)}`;
+    // Navigate to buyer section and set search query
+    showSection('buyer');
+    const searchInput = $('#pet-search');
+    if (searchInput) searchInput.value = query;
+    // Trigger search functionality if it exists
+    if (window.searchPets) window.searchPets(query);
   }
 };
 
@@ -485,6 +490,27 @@ const showSection = (sectionId) => {
   const mobileMenu = $('#mobile-menu');
   if (mobileMenu) {
     mobileMenu.style.display = 'none';
+  }
+};
+
+// Show pet details in buyer section
+const showPetDetails = (petSlug) => {
+  // Navigate to buyer section first
+  showSection('buyer');
+  
+  // If pet details functionality exists, call it
+  if (window.displayPetDetails && typeof window.displayPetDetails === 'function') {
+    window.displayPetDetails(petSlug);
+  } else {
+    // Fallback: try to find and trigger pet search
+    const searchInput = $('#pet-search');
+    if (searchInput) {
+      searchInput.value = petSlug;
+      // Trigger search if function exists
+      if (window.searchPets && typeof window.searchPets === 'function') {
+        window.searchPets(petSlug);
+      }
+    }
   }
 };
 
@@ -845,7 +871,7 @@ const loadFeaturedPets = async () => {
 // Create pet card HTML
 const createPetCard = (pet) => {
   return `
-    <a href="/apps/frontend/buyer.html?pet=${pet.slug}" class="pet-card">
+    <a href="#buyer" onclick="showPetDetails('${pet.slug}')" class="pet-card">
       <div class="pet-card-image">
         <img src="${pet.photos[0] || 'https://via.placeholder.com/280x200'}" 
              alt="${pet.title}" class="pet-card-img">

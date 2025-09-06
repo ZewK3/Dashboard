@@ -112,12 +112,12 @@ R2_PUBLIC_BASE = "https://your-r2-domain.com"
 
 ### 5. Run Database Migrations
 ```bash
-wrangler d1 execute PET_DB --file=apps/backend/schema.sql
+wrangler d1 execute PET_DB --file=schema.sql
 ```
 
 ### 6. Seed Development Data
 ```bash
-wrangler d1 execute PET_DB --file=apps/backend/seeds.sql
+wrangler d1 execute PET_DB --file=seeds.sql
 ```
 
 ### 7. Deploy Worker
@@ -128,42 +128,33 @@ wrangler deploy
 ### 8. Serve Frontend
 ```bash
 # Simple HTTP server
-npx http-server apps/frontend -p 8080
+npx http-server . -p 8080
 
 # Or use any static server
-python -m http.server 8080 -d apps/frontend
+python -m http.server 8080
 ```
 
 ## 📁 Project Structure
 
 ```
-apps/
-├── frontend/                 # Frontend application
-│   ├── index.html            # Landing page
-│   ├── buyer.html            # Buyer interface
-│   ├── seller.html           # Seller dashboard
-│   ├── admin.html            # Admin panel
-│   ├── support.html          # Support interface
-│   └── assets/
-│       ├── css/styles.css    # Modern CSS with custom properties
-│       ├── js/               # Modular JavaScript
-│       │   ├── main.js       # Application entry point
-│       │   ├── api.js        # API client
-│       │   ├── auth.js       # Authentication
-│       │   ├── pets.js       # Pet listings
-│       │   ├── utils.js      # Utilities
-│       │   └── i18n.js       # Internationalization
-│       ├── img/brand/        # Branding assets
-│       └── i18n/             # Translation files
-│           ├── vi.json       # Vietnamese
-│           └── en.json       # English
-└── backend/                  # Backend API
-    ├── worker.js             # Cloudflare Worker
-    ├── schema.sql            # Database schema
-    └── seeds.sql             # Sample data
-
-wrangler.toml                 # Cloudflare configuration
-README.md                     # This file
+Dashboard/
+├── index.html                 # Single-page application with all interfaces
+├── assets/                    # Frontend assets
+│   ├── css/styles.css         # Modern CSS with custom properties
+│   ├── js/                    # Modular JavaScript
+│   │   ├── main.js            # Application entry point
+│   │   ├── api.js             # API client
+│   │   ├── utils.js           # Utilities
+│   │   └── i18n.js            # Internationalization
+│   └── i18n/                  # Translation files
+│       ├── vi.json            # Vietnamese
+│       └── en.json            # English
+├── worker.js                  # Cloudflare Worker backend
+├── schema.sql                 # Database schema
+├── seeds.sql                  # Sample data
+├── r2_policy.md              # R2 storage policy
+├── wrangler.toml             # Cloudflare configuration
+└── README.md                 # This file
 ```
 
 ## 🌐 API Endpoints
@@ -222,7 +213,7 @@ README.md                     # This file
 wrangler dev
 
 # Start frontend (separate terminal)
-npx http-server apps/frontend -p 8080
+npx http-server . -p 8080
 ```
 
 ### Database Management
@@ -290,7 +281,7 @@ The platform supports multiple languages:
 - **Vietnamese** (vi): Primary language
 - **English** (en): Secondary language
 
-Translation files are located in `apps/frontend/assets/i18n/`.
+Translation files are located in `assets/i18n/`.
 
 ## 🤝 Contributing
 

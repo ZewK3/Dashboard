@@ -1,5 +1,5 @@
 name = "pet-market"
-main = "apps/backend/worker.js"
+main = "worker.js"
 compatibility_date = "2024-01-15"
 compatibility_flags = ["nodejs_compat"]
 
@@ -15,7 +15,7 @@ R2_PUBLIC_BASE = "https://pet-images.your-domain.com"
 binding = "PET_DB"
 database_name = "pet_market_db"
 database_id = "your-d1-database-id-here"
-migrations_dir = "apps/backend/migrations"
+migrations_dir = "migrations"
 
 # R2 Storage binding for pet images
 [[r2_buckets]]
