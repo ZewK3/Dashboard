@@ -396,6 +396,30 @@ const redirectToSearch = (query) => {
 
 // Initialize navigation
 const initNavigation = () => {
+  // Handle section navigation
+  const navButtons = $$('.nav-btn');
+  navButtons.forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      const section = btn.dataset.section;
+      const species = btn.dataset.species;
+      
+      if (section) {
+        showSection(section);
+        if (section === 'buyer-portal' && species) {
+          // Set species filter if specified
+          setTimeout(() => {
+            const speciesFilter = $('#species-filter');
+            if (speciesFilter) {
+              speciesFilter.value = species;
+              applyBuyerFilters();
+            }
+          }, 100);
+        }
+      }
+    });
+  });
+
   // Highlight current page in navigation
   const currentPath = window.location.pathname;
   const navLinks = $$('.nav-link, .mobile-nav-link');
@@ -406,15 +430,62 @@ const initNavigation = () => {
     }
   });
   
-  // Handle navigation clicks
+  // Handle navigation clicks for external links
   navLinks.forEach(link => {
-    on(link, 'click', (event) => {
-      // Add loading state if needed
-      if (link.classList.contains('nav-link')) {
-        showLoading();
-      }
-    });
+    if (!link.classList.contains('nav-btn')) {
+      on(link, 'click', (event) => {
+        // Add loading state if needed
+        if (link.classList.contains('nav-link')) {
+          showLoading();
+        }
+      });
+    }
   });
+
+  // Handle URL hash navigation
+  const hash = window.location.hash.substring(1);
+  if (hash && $('#' + hash)) {
+    showSection(hash);
+  }
+};
+
+// Show specific section and hide others
+const showSection = (sectionId) => {
+  const sections = $$('.page-section');
+  sections.forEach(section => {
+    if (section.id === sectionId) {
+      section.style.display = 'block';
+      // Update URL without reload
+      if (sectionId !== 'home') {
+        window.history.pushState({}, '', `#${sectionId}`);
+      } else {
+        window.history.pushState({}, '', window.location.pathname);
+      }
+    } else {
+      section.style.display = 'none';
+    }
+  });
+
+  // Update active nav state
+  $$('.nav-link, .mobile-nav-link, .nav-btn').forEach(link => {
+    link.classList.remove('active');
+  });
+  
+  const activeNavs = $$(`[data-section="${sectionId}"]`);
+  activeNavs.forEach(nav => nav.classList.add('active'));
+
+  // Initialize section-specific functionality
+  if (sectionId === 'buyer-portal') {
+    initBuyerPortal();
+  } else if (sectionId === 'seller-portal') {
+    initSellerPortal();
+  }
+
+  // Close mobile menu if open
+  const mobileMenu = $('#mobile-menu');
+  if (mobileMenu) {
+    mobileMenu.style.display = 'none';
+  }
 };
 
 // Initialize smooth scrolling
@@ -844,6 +915,375 @@ const animateNumber = (element, target, duration = 2000) => {
 };
 
 // Placeholder functions for other pages
+// Initialize buyer portal functionality
+const initBuyerPortal = () => {
+  if (window.buyerPortalInitialized) return;
+  window.buyerPortalInitialized = true;
+
+  // Initialize search
+  const buyerSearch = $('#buyer-search');
+  const buyerSearchBtn = $('#buyer-search-btn');
+  
+  if (buyerSearch && buyerSearchBtn) {
+    const performBuyerSearch = debounce(async () => {
+      const query = buyerSearch.value.trim();
+      if (query) {
+        await loadPets({ search: query });
+      }
+    }, CONFIG.DEBOUNCE_DELAY);
+
+    on(buyerSearch, 'input', performBuyerSearch);
+    on(buyerSearchBtn, 'click', performBuyerSearch);
+  }
+
+  // Initialize filters
+  const applyFiltersBtn = $('#apply-filters');
+  const clearFiltersBtn = $('#clear-filters');
+  
+  if (applyFiltersBtn) {
+    on(applyFiltersBtn, 'click', applyBuyerFilters);
+  }
+  
+  if (clearFiltersBtn) {
+    on(clearFiltersBtn, 'click', clearBuyerFilters);
+  }
+
+  // Initialize quick actions
+  const viewCartBtn = $('#view-cart');
+
+  if (viewCartBtn) {
+    on(viewCartBtn, 'click', () => openModal('cart-modal'));
+  }
+
+  // Initialize view controls
+  const viewBtns = $$('.view-btn');
+  viewBtns.forEach(btn => {
+    on(btn, 'click', () => {
+      viewBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const view = btn.dataset.view;
+      updatePetsView(view);
+    });
+  });
+
+  // Initialize sort
+  const sortSelect = $('#sort-pets');
+  if (sortSelect) {
+    on(sortSelect, 'change', () => {
+      applyBuyerFilters();
+    });
+  }
+
+  // Load initial pets
+  loadPets();
+};
+
+// Apply buyer filters
+const applyBuyerFilters = async () => {
+  const species = $('#species-filter')?.value || '';
+  const price = $('#price-filter')?.value || '';
+  const location = $('#location-filter')?.value || '';
+  const age = $('#age-filter')?.value || '';
+  const sort = $('#sort-pets')?.value || 'newest';
+  const search = $('#buyer-search')?.value || '';
+
+  const filters = { species, price, location, age, sort, search };
+  await loadPets(filters);
+};
+
+// Clear buyer filters
+const clearBuyerFilters = () => {
+  $('#species-filter').value = '';
+  $('#price-filter').value = '';
+  $('#location-filter').value = '';
+  $('#age-filter').value = '';
+  $('#buyer-search').value = '';
+  loadPets();
+};
+
+// Load pets with filters
+const loadPets = async (filters = {}) => {
+  const grid = $('#buyer-pets-grid');
+  if (!grid) return;
+
+  try {
+    showLoading();
+    const response = await api.petsAPI.getPets(filters);
+    
+    if (response.success) {
+      displayPets(response.data.pets || response.data || []);
+    } else {
+      showToast('Không thể tải danh sách thú cưng', 'error');
+    }
+  } catch (error) {
+    console.error('Error loading pets:', error);
+    showToast('Có lỗi xảy ra khi tải dữ liệu', 'error');
+  } finally {
+    hideLoading();
+  }
+};
+
+// Display pets in grid
+const displayPets = (pets) => {
+  const grid = $('#buyer-pets-grid');
+  if (!grid) return;
+
+  if (!pets || pets.length === 0) {
+    grid.innerHTML = `
+      <div class="no-results">
+        <i class="fas fa-search"></i>
+        <h3>Không tìm thấy thú cưng</h3>
+        <p>Thử thay đổi bộ lọc tìm kiếm của bạn</p>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = pets.map(pet => createBuyerPetCard(pet)).join('');
+};
+
+// Create buyer pet card
+const createBuyerPetCard = (pet) => {
+  const price = pet.price ? pet.price.toLocaleString('vi-VN') + ' VND' : 'Liên hệ';
+  const image = pet.images && pet.images.length > 0 ? pet.images[0] : 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=300&h=200&fit=crop';
+  
+  return `
+    <div class="pet-card" data-pet-id="${pet.id}">
+      <div class="pet-image">
+        <img src="${image}" alt="${pet.title}" loading="lazy">
+        <div class="pet-actions">
+          <button class="action-btn favorite-btn" onclick="toggleFavorite('${pet.id}')" data-pet-id="${pet.id}">
+            <i class="fas fa-heart"></i>
+          </button>
+          <button class="action-btn cart-btn" onclick="addToCart('${pet.id}')" data-pet-id="${pet.id}">
+            <i class="fas fa-shopping-cart"></i>
+          </button>
+        </div>
+      </div>
+      <div class="pet-info">
+        <h3 class="pet-title">${pet.title}</h3>
+        <p class="pet-breed">${pet.breed || pet.species}</p>
+        <div class="pet-details">
+          <span class="pet-age"><i class="fas fa-birthday-cake"></i> ${pet.age || 'N/A'} tháng</span>
+          <span class="pet-location"><i class="fas fa-map-marker-alt"></i> ${pet.location || 'N/A'}</span>
+        </div>
+        <div class="pet-price">${price}</div>
+        <button class="btn btn-primary btn-small view-details-btn" onclick="viewPetDetails('${pet.id}')">
+          Xem chi tiết
+        </button>
+      </div>
+    </div>
+  `;
+};
+
+// Initialize seller portal functionality  
+const initSellerPortal = () => {
+  if (window.sellerPortalInitialized) return;
+  window.sellerPortalInitialized = true;
+
+  // Check if user is authenticated and has seller role
+  if (!currentUser || (currentUser.role !== 'seller' && currentUser.role !== 'admin')) {
+    showToast('Bạn cần đăng nhập với tài khoản người bán để truy cập trang này', 'warning');
+    showAuthModal('login');
+    showSection('home');
+    return;
+  }
+
+  // Initialize seller actions
+  const createListingBtn = $('#create-listing');
+  const manageOrdersBtn = $('#manage-orders');
+
+  if (createListingBtn) {
+    on(createListingBtn, 'click', () => openModal('create-listing-modal'));
+  }
+
+  if (manageOrdersBtn) {
+    on(manageOrdersBtn, 'click', toggleOrdersSection);
+  }
+
+  // Initialize listing filters
+  const listingStatusFilter = $('#listing-status-filter');
+  if (listingStatusFilter) {
+    on(listingStatusFilter, 'change', loadSellerListings);
+  }
+
+  // Initialize order filters  
+  const orderStatusFilter = $('#order-status-filter');
+  if (orderStatusFilter) {
+    on(orderStatusFilter, 'change', loadSellerOrders);
+  }
+
+  // Load seller data
+  loadSellerStats();
+  loadSellerListings();
+};
+
+// Load seller statistics
+const loadSellerStats = async () => {
+  try {
+    const response = await api.sellersAPI?.getStats();
+    if (response?.success) {
+      const stats = response.data;
+      updateStatElement('total-listings', stats.totalListings || 0);
+      updateStatElement('total-views', stats.totalViews || 0);
+      updateStatElement('total-orders', stats.totalOrders || 0);
+      updateStatElement('total-revenue', (stats.totalRevenue || 0).toLocaleString('vi-VN'));
+    }
+  } catch (error) {
+    console.error('Error loading seller stats:', error);
+  }
+};
+
+// Update stat element
+const updateStatElement = (id, value) => {
+  const element = $('#' + id);
+  if (element) {
+    element.textContent = value;
+  }
+};
+
+// Load seller listings
+const loadSellerListings = async () => {
+  const grid = $('#seller-listings-grid');
+  if (!grid) return;
+
+  try {
+    const status = $('#listing-status-filter')?.value || '';
+    const response = await api.sellersAPI?.getListings({ status });
+    
+    if (response?.success) {
+      displaySellerListings(response.data.listings || []);
+    }
+  } catch (error) {
+    console.error('Error loading seller listings:', error);
+    showToast('Không thể tải danh sách tin đăng', 'error');
+  }
+};
+
+// Display seller listings
+const displaySellerListings = (listings) => {
+  const grid = $('#seller-listings-grid');
+  if (!grid) return;
+
+  if (!listings || listings.length === 0) {
+    grid.innerHTML = `
+      <div class="no-results">
+        <i class="fas fa-list"></i>
+        <h3>Chưa có tin đăng nào</h3>
+        <p>Hãy tạo tin đăng đầu tiên của bạn</p>
+        <button class="btn btn-primary" onclick="openModal('create-listing-modal')">
+          <i class="fas fa-plus"></i> Đăng tin ngay
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = listings.map(listing => createSellerListingCard(listing)).join('');
+};
+
+// Create seller listing card
+const createSellerListingCard = (listing) => {
+  const price = listing.price ? listing.price.toLocaleString('vi-VN') + ' VND' : 'Liên hệ';
+  const image = listing.images && listing.images.length > 0 ? listing.images[0] : 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=300&h=200&fit=crop';
+  const statusClass = `status-${listing.status}`;
+  const statusText = getStatusText(listing.status);
+  
+  return `
+    <div class="listing-card" data-listing-id="${listing.id}">
+      <div class="listing-image">
+        <img src="${image}" alt="${listing.title}">
+        <div class="listing-status ${statusClass}">${statusText}</div>
+      </div>
+      <div class="listing-info">
+        <h3 class="listing-title">${listing.title}</h3>
+        <div class="listing-stats">
+          <span><i class="fas fa-eye"></i> ${listing.views || 0} lượt xem</span>
+          <span><i class="fas fa-heart"></i> ${listing.favorites || 0} yêu thích</span>
+        </div>
+        <div class="listing-price">${price}</div>
+        <div class="listing-actions">
+          <button class="btn btn-outline btn-small" onclick="editListing('${listing.id}')">
+            <i class="fas fa-edit"></i> Sửa
+          </button>
+          <button class="btn btn-outline btn-small" onclick="toggleListingStatus('${listing.id}')">
+            <i class="fas fa-toggle-on"></i> ${listing.status === 'active' ? 'Ẩn' : 'Hiện'}
+          </button>
+          <button class="btn btn-danger btn-small" onclick="deleteListing('${listing.id}')">
+            <i class="fas fa-trash"></i> Xóa
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+// Get status text
+const getStatusText = (status) => {
+  const statusMap = {
+    'active': 'Đang hiển thị',
+    'pending': 'Chờ duyệt', 
+    'sold': 'Đã bán',
+    'inactive': 'Tạm ẩn'
+  };
+  return statusMap[status] || status;
+};
+
+// Toggle orders section
+const toggleOrdersSection = () => {
+  const ordersSection = $('#orders-section');
+  const listingsSection = $('.listings-section');
+  
+  if (ordersSection && ordersSection.style.display === 'none') {
+    ordersSection.style.display = 'block';
+    if (listingsSection) listingsSection.style.display = 'none';
+    loadSellerOrders();
+  } else {
+    if (ordersSection) ordersSection.style.display = 'none';
+    if (listingsSection) listingsSection.style.display = 'block';
+  }
+};
+
+// Placeholder pet interaction functions
+window.toggleFavorite = (petId) => {
+  console.log('Toggle favorite for pet:', petId);
+  showToast('Tính năng đang được phát triển', 'info');
+};
+
+window.addToCart = (petId) => {
+  console.log('Add to cart pet:', petId);
+  showToast('Đã thêm vào giỏ hàng', 'success');
+};
+
+window.viewPetDetails = (petId) => {
+  console.log('View pet details:', petId);
+  openModal('pet-detail-modal');
+};
+
+// Placeholder seller functions
+window.editListing = (listingId) => {
+  console.log('Edit listing:', listingId);
+  showToast('Tính năng đang được phát triển', 'info');
+};
+
+window.toggleListingStatus = (listingId) => {
+  console.log('Toggle listing status:', listingId);
+  showToast('Tính năng đang được phát triển', 'info');
+};
+
+window.deleteListing = (listingId) => {
+  console.log('Delete listing:', listingId);
+  showToast('Tính năng đang được phát triển', 'info');
+};
+
+const loadSellerOrders = () => {
+  console.log('Loading seller orders...');
+};
+
+const updatePetsView = (view) => {
+  console.log('Update pets view:', view);
+};
+
 const initBuyerPage = () => {
   console.log('Buyer page initialized');
 };
