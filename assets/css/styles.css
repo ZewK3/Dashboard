@@ -3265,3 +3265,148 @@ a:hover {
     margin-bottom: var(--space-4);
   }
 }
+
+/* User Balance and Top-up Styles */
+.user-balance {
+  padding: var(--space-3);
+  background: linear-gradient(135deg, var(--pink-soft) 0%, var(--pink-pastel) 100%);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+}
+
+.balance-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.balance-info i {
+  color: var(--pink-primary);
+}
+
+.balance-info strong {
+  color: var(--pink-accent);
+  font-size: 1.1rem;
+}
+
+/* Top-up Modal Styles */
+.topup-options {
+  padding: var(--space-4) 0;
+}
+
+.amount-presets h3,
+.payment-methods h3 {
+  margin-bottom: var(--space-3);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+}
+
+.preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.preset-btn {
+  padding: var(--space-3);
+  border: 2px solid var(--border-light);
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preset-btn:hover,
+.preset-btn.active {
+  border-color: var(--pink-primary);
+  background: var(--pink-soft);
+  color: var(--pink-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.custom-amount {
+  margin-bottom: var(--space-4);
+}
+
+.custom-amount label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.custom-amount input {
+  width: 100%;
+  padding: var(--space-3);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.custom-amount input:focus {
+  outline: none;
+  border-color: var(--pink-primary);
+}
+
+.payment-options {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.payment-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.payment-option:hover {
+  border-color: var(--pink-primary);
+  background: var(--pink-soft);
+}
+
+.payment-option input[type="radio"] {
+  margin: 0;
+}
+
+.payment-option i {
+  font-size: 1.2rem;
+  color: var(--pink-primary);
+}
+
+.payment-option span {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Mobile responsiveness for balance and top-up */
+@media (max-width: 768px) {
+  .preset-buttons {
+    grid-template-columns: 1fr;
+  }
+  
+  .user-balance {
+    padding: var(--space-2);
+  }
+  
+  .balance-info {
+    font-size: 0.8rem;
+  }
+  
+  .balance-info strong {
+    font-size: 1rem;
+  }
+}

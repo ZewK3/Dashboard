@@ -127,6 +127,18 @@
                             <i class="fas fa-chevron-down"></i>
                         </button>
                         <div class="user-dropdown" id="user-dropdown">
+                            <div class="user-balance">
+                                <div class="balance-info">
+                                    <i class="fas fa-wallet"></i>
+                                    <span>Số dư: </span>
+                                    <strong id="user-balance">$0.00</strong>
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="openTopUpModal()">
+                                    <i class="fas fa-plus"></i>
+                                    Nạp tiền
+                                </button>
+                            </div>
+                            <div class="dropdown-divider"></div>
                             <a href="#" class="dropdown-item" id="profile-link">
                                 <i class="fas fa-user"></i>
                                 <span data-i18n="user.profile">Hồ sơ</span>
@@ -138,6 +150,15 @@
                             <a href="#" class="dropdown-item" id="favorites-link">
                                 <i class="fas fa-heart"></i>
                                 <span data-i18n="user.favorites">Yêu thích</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item" id="become-seller-link" onclick="becomeSeller()">
+                                <i class="fas fa-store"></i>
+                                <span>Đăng ký bán thú cưng</span>
+                            </a>
+                            <a href="#" class="dropdown-item" id="my-listings-link" onclick="showSection('seller-portal')" style="display: none;">
+                                <i class="fas fa-list"></i>
+                                <span>Tin đăng của tôi</span>
                             </a>
                             <div class="dropdown-divider"></div>
                             <button class="dropdown-item" id="logout-btn">
@@ -477,12 +498,12 @@
         </section>
         </section>
 
-        <!-- Buyer Portal Section -->
+        <!-- Pet Browse Section -->
         <section id="buyer-portal" class="page-section" style="display: none;">
             <div class="container">
                 <div class="buyer-header">
-                    <h1 class="section-title" data-i18n="buyer.title">Khám phá thú cưng</h1>
-                    <p class="section-subtitle" data-i18n="buyer.subtitle">Tìm kiếm người bạn đồng hành hoàn hảo cho gia đình bạn</p>
+                    <h1 class="section-title">Khám phá thú cưng</h1>
+                    <p class="section-subtitle">Tìm kiếm người bạn đồng hành hoàn hảo cho gia đình bạn</p>
                 </div>
 
                 <!-- Search and Filters -->
@@ -605,8 +626,8 @@
         <section id="seller-portal" class="page-section" style="display: none;">
             <div class="container">
                 <div class="seller-header">
-                    <h1 class="section-title" data-i18n="seller.title">Quản lý tin đăng</h1>
-                    <p class="section-subtitle" data-i18n="seller.subtitle">Đăng bán thú cưng và quản lý đơn hàng của bạn</p>
+                    <h1 class="section-title">Quản lý tin đăng</h1>
+                    <p class="section-subtitle">Đăng bán thú cưng và quản lý đơn hàng của bạn</p>
                 </div>
 
                 <!-- Seller Stats -->
@@ -1259,6 +1280,59 @@
                         Chưa có tài khoản? 
                         <button type="button" id="auth-switch-btn" class="link-btn">Đăng ký ngay</button>
                     </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top-up Modal -->
+    <div id="topup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nạp tiền vào tài khoản</h2>
+                <button class="modal-close" onclick="closeModal('topup-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="topup-options">
+                    <div class="amount-presets">
+                        <h3>Chọn số tiền nạp:</h3>
+                        <div class="preset-buttons">
+                            <button class="preset-btn" data-amount="5">$5.00</button>
+                            <button class="preset-btn" data-amount="10">$10.00</button>
+                            <button class="preset-btn" data-amount="20">$20.00</button>
+                            <button class="preset-btn" data-amount="50">$50.00</button>
+                        </div>
+                    </div>
+                    <div class="custom-amount">
+                        <label for="custom-amount">Hoặc nhập số tiền khác:</label>
+                        <input type="number" id="custom-amount" min="1" max="1000" step="0.50" placeholder="Nhập số tiền ($)">
+                    </div>
+                    <div class="payment-methods">
+                        <h3>Phương thức thanh toán:</h3>
+                        <div class="payment-options">
+                            <label class="payment-option">
+                                <input type="radio" name="payment-method" value="credit-card" checked>
+                                <i class="fas fa-credit-card"></i>
+                                <span>Thẻ tín dụng</span>
+                            </label>
+                            <label class="payment-option">
+                                <input type="radio" name="payment-method" value="paypal">
+                                <i class="fab fa-paypal"></i>
+                                <span>PayPal</span>
+                            </label>
+                            <label class="payment-option">
+                                <input type="radio" name="payment-method" value="bank-transfer">
+                                <i class="fas fa-university"></i>
+                                <span>Chuyển khoản</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeModal('topup-modal')">Hủy</button>
+                    <button class="btn btn-primary" onclick="processTopUp()">Nạp tiền</button>
                 </div>
             </div>
         </div>

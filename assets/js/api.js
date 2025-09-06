@@ -22,6 +22,7 @@ const DEMO_DATA = {
       email: 'buyer@demo.com',
       fullName: 'Nguyễn Văn A',
       role: 'buyer',
+      canSell: false,
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
       phone: '0123456789',
       address: '123 Nguyễn Huệ, Quận 1, TP.HCM',
@@ -32,6 +33,7 @@ const DEMO_DATA = {
       email: 'seller@demo.com', 
       fullName: 'Trần Thị B',
       role: 'seller',
+      canSell: true,
       avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
       phone: '0987654321',
       address: '456 Lê Lợi, Quận Hai Bà Trưng, Hà Nội',
@@ -43,6 +45,7 @@ const DEMO_DATA = {
       email: 'admin@demo.com',
       fullName: 'Admin PetMarket',
       role: 'admin',
+      canSell: true,
       avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
       phone: '0111222333',
       address: 'Văn phòng PetMarket',
@@ -53,6 +56,7 @@ const DEMO_DATA = {
       email: 'support@demo.com',
       fullName: 'Nguyễn Thị Hỗ Trợ',
       role: 'support',
+      canSell: false,
       avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
       phone: '0999888777',
       address: 'Phòng CSKH PetMarket',
@@ -63,6 +67,7 @@ const DEMO_DATA = {
       email: 'seller2@demo.com',
       fullName: 'Lê Văn C',
       role: 'seller',
+      canSell: true,
       avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
       phone: '0345678901',
       address: '789 Võ Văn Tần, Quận 3, TP.HCM',
@@ -74,6 +79,7 @@ const DEMO_DATA = {
       email: 'buyer2@demo.com',
       fullName: 'Phạm Thị D',
       role: 'buyer',
+      canSell: false,
       avatar: 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=150&h=150&fit=crop&crop=face',
       phone: '0567890123',
       address: '321 Cách Mạng Tháng 8, Quận 10, TP.HCM',
@@ -232,6 +238,7 @@ const mockAPI = {
         id: DEMO_DATA.users.length + 1,
         ...userData,
         role: 'buyer',
+        canSell: false,
         avatar: null,
         createdAt: new Date().toISOString()
       };
@@ -306,8 +313,8 @@ const mockAPI = {
     
     createPet: async (petData) => {
       await mockDelay(800);
-      if (!DEMO_DATA.currentUser || DEMO_DATA.currentUser.role !== 'seller') {
-        throw new Error('Chỉ người bán mới có thể đăng tin');
+      if (!DEMO_DATA.currentUser || !DEMO_DATA.currentUser.canSell) {
+        throw new Error('Bạn cần đăng ký trở thành người bán để có thể đăng tin');
       }
       const newPet = {
         id: DEMO_DATA.pets.length + 1,

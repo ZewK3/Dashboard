@@ -146,6 +146,21 @@ const updateAuthUI = (isLoggedIn) => {
         userName.textContent = currentUser.fullName;
       }
       
+      // Update balance display
+      updateUserBalance();
+      
+      // Update seller status display
+      const myListingsLink = $('#my-listings-link');
+      const becomeSellerLink = $('#become-seller-link');
+      
+      if (currentUser.canSell) {
+        if (myListingsLink) myListingsLink.style.display = 'block';
+        if (becomeSellerLink) becomeSellerLink.style.display = 'none';
+      } else {
+        if (myListingsLink) myListingsLink.style.display = 'none';
+        if (becomeSellerLink) becomeSellerLink.style.display = 'block';
+      }
+      
       // Update profile links based on role
       updateNavigationByRole(currentUser.role);
     }
@@ -647,6 +662,12 @@ const initModals = () => {
     on(registerForm, 'submit', handleRegister);
   }
   
+  // Handle create listing form submission
+  const createListingForm = $('#create-listing-form');
+  if (createListingForm) {
+    on(createListingForm, 'submit', handleCreateListing);
+  }
+  
   // Close modals when clicking outside
   on(document, 'click', (event) => {
     if (event.target.classList.contains('modal')) {
@@ -745,6 +766,57 @@ const handleRegister = async (event) => {
     }));
     
   } catch (error) {
+    showToast(api.handleApiError(error, false), 'error');
+  } finally {
+    hideLoading();
+  }
+};
+
+// Handle create listing form submission
+const handleCreateListing = async (event) => {
+  event.preventDefault();
+  
+  // Check if user is logged in
+  if (!currentUser) {
+    showToast('Vui lòng đăng nhập để đăng tin', 'error');
+    return;
+  }
+  
+  // Check if user can sell
+  if (!currentUser.canSell) {
+    showToast('Bạn cần đăng ký trở thành người bán để có thể đăng tin', 'error');
+    becomeSeller();
+    return;
+  }
+  
+  // Check and deduct posting fee
+  if (!deductPostingFee()) {
+    return; // Fee deduction failed
+  }
+  
+  const formData = utils.form.serialize(event.target);
+  
+  try {
+    showLoading();
+    const response = await api.petsAPI.createPet(formData);
+    
+    if (response.success) {
+      closeModal('create-listing-modal');
+      showToast('Đăng tin thành công!', 'success');
+      
+      // Reset form
+      event.target.reset();
+      
+      // Refresh listings if on seller portal
+      if (window.location.hash.includes('seller') || $('.page-section#seller-portal').style.display !== 'none') {
+        loadSellerListings();
+      }
+    }
+    
+  } catch (error) {
+    // If listing creation failed, refund the fee
+    userBalance += 0.5;
+    updateUserBalance();
     showToast(api.handleApiError(error, false), 'error');
   } finally {
     hideLoading();
@@ -1079,7 +1151,7 @@ const loadPets = async (filters = {}) => {
     const response = await api.petsAPI.getPets(filters);
     
     if (response.success) {
-      displayPets(response.data.pets || response.data || []);
+      displayPets(response.pets || []);
     } else {
       showToast('Không thể tải danh sách thú cưng', 'error');
     }
@@ -1824,3 +1896,115 @@ window.app = {
 window.utils = utils;
 window.api = api;
 window.i18n = i18n;
+
+// Make functions globally accessible for onclick handlers
+window.closeModal = closeModal;
+window.openModal = openModal;
+window.showSection = showSection;
+
+// User balance and seller functionality
+let userBalance = 5.00; // Default balance for demo
+
+const updateUserBalance = () => {
+  const balanceElement = $('#user-balance');
+  if (balanceElement && currentUser) {
+    balanceElement.textContent = `$${userBalance.toFixed(2)}`;
+  }
+};
+
+const openTopUpModal = () => {
+  openModal('topup-modal');
+  
+  // Setup preset button handlers
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      // Remove active from all buttons
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      // Add active to clicked button
+      e.target.classList.add('active');
+      // Clear custom amount
+      $('#custom-amount').value = '';
+    });
+  });
+};
+
+const processTopUp = () => {
+  const activePreset = document.querySelector('.preset-btn.active');
+  const customAmount = $('#custom-amount').value;
+  const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+  
+  let amount = 0;
+  if (activePreset) {
+    amount = parseFloat(activePreset.dataset.amount);
+  } else if (customAmount) {
+    amount = parseFloat(customAmount);
+  }
+  
+  if (amount <= 0) {
+    showToast('Vui lòng chọn số tiền nạp', 'error');
+    return;
+  }
+  
+  if (amount > 1000) {
+    showToast('Số tiền nạp không được vượt quá $1000', 'error');
+    return;
+  }
+  
+  // Demo payment processing
+  showLoading();
+  setTimeout(() => {
+    userBalance += amount;
+    updateUserBalance();
+    closeModal('topup-modal');
+    hideLoading();
+    showToast(`Nạp thành công $${amount.toFixed(2)} vào tài khoản!`, 'success');
+    
+    // Clear form
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    $('#custom-amount').value = '';
+  }, 2000);
+};
+
+const becomeSeller = () => {
+  if (!currentUser) {
+    showToast('Vui lòng đăng nhập để trở thành người bán', 'error');
+    return;
+  }
+  
+  // Update user role to include seller
+  currentUser.canSell = true;
+  
+  // Show seller menu item
+  const myListingsLink = $('#my-listings-link');
+  const becomeSellerLink = $('#become-seller-link');
+  
+  if (myListingsLink) myListingsLink.style.display = 'block';
+  if (becomeSellerLink) becomeSellerLink.style.display = 'none';
+  
+  showToast('Bạn đã trở thành người bán thành công! Giờ bạn có thể đăng tin bán thú cưng.', 'success');
+  
+  // Show seller portal
+  showSection('seller-portal');
+};
+
+const deductPostingFee = () => {
+  const POSTING_FEE = 0.5;
+  
+  if (userBalance < POSTING_FEE) {
+    showToast(`Số dư không đủ. Cần $${POSTING_FEE} để đăng tin. Vui lòng nạp thêm tiền.`, 'error');
+    openTopUpModal();
+    return false;
+  }
+  
+  userBalance -= POSTING_FEE;
+  updateUserBalance();
+  showToast(`Đã trừ $${POSTING_FEE} phí đăng tin từ tài khoản`, 'info');
+  return true;
+};
+
+// Make new functions globally available
+window.openTopUpModal = openTopUpModal;
+window.processTopUp = processTopUp;
+window.becomeSeller = becomeSeller;
+window.deductPostingFee = deductPostingFee;
+window.updateUserBalance = updateUserBalance;
