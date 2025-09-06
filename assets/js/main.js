@@ -10,7 +10,6 @@ import i18n from './i18n.js';
 // Application state
 let isInitialized = false;
 let currentUser = null;
-let currentTheme = 'light';
 
 // Configuration
 const CONFIG = {
@@ -39,9 +38,6 @@ const init = async () => {
     // Initialize internationalization
     await i18n.init(CONFIG.DEFAULT_LANGUAGE);
     
-    // Initialize theme
-    initTheme();
-    
     // Initialize authentication
     await initAuth();
     
@@ -53,6 +49,9 @@ const init = async () => {
     
     // Initialize navigation
     initNavigation();
+    
+    // Initialize carousel
+    initCarousel();
     
     // Initialize modals
     initModals();
@@ -83,66 +82,6 @@ const init = async () => {
   } catch (error) {
     console.error('Failed to initialize application:', error);
     showToast('Không thể khởi tạo ứng dụng. Vui lòng tải lại trang.', 'error');
-  }
-};
-
-// Initialize theme system
-const initTheme = () => {
-  // Get saved theme or detect system preference
-  const savedTheme = storage.get('theme');
-  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  currentTheme = savedTheme || systemTheme;
-  
-  // Apply theme
-  applyTheme(currentTheme);
-  
-  // Setup theme toggle
-  const themeToggle = $('#theme-toggle');
-  if (themeToggle) {
-    updateThemeToggle();
-    
-    on(themeToggle, 'click', () => {
-      toggleTheme();
-    });
-  }
-  
-  // Listen for system theme changes
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    if (!storage.get('theme')) {
-      const newTheme = e.matches ? 'dark' : 'light';
-      applyTheme(newTheme);
-      currentTheme = newTheme;
-      updateThemeToggle();
-    }
-  });
-};
-
-// Apply theme
-const applyTheme = (theme) => {
-  document.documentElement.setAttribute('data-theme', theme);
-  currentTheme = theme;
-};
-
-// Toggle theme
-const toggleTheme = () => {
-  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-  applyTheme(newTheme);
-  storage.set('theme', newTheme);
-  updateThemeToggle();
-  
-  // Dispatch theme change event
-  window.dispatchEvent(new CustomEvent('theme:changed', {
-    detail: { theme: newTheme }
-  }));
-};
-
-// Update theme toggle button
-const updateThemeToggle = () => {
-  const themeToggle = $('#theme-toggle');
-  const icon = themeToggle?.querySelector('i');
-  
-  if (icon) {
-    icon.className = currentTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
   }
 };
 
@@ -506,6 +445,9 @@ const showSection = (sectionId) => {
   const activeNavs = $$(`[data-section="${sectionId}"]`);
   activeNavs.forEach(nav => nav.classList.add('active'));
 
+// Make showSection globally accessible for onclick handlers
+window.showSection = showSection;
+
   // Initialize section-specific functionality
   if (sectionId === 'buyer-portal') {
     initBuyerPortal();
@@ -551,6 +493,67 @@ const showPetDetails = (petSlug) => {
       }
     }
   }
+};
+
+// Initialize pet showcase carousel
+const initCarousel = () => {
+  const carousel = $('#pet-carousel');
+  const slides = $$('.carousel-slide');
+  const indicators = $$('.indicator');
+  
+  if (!carousel || slides.length === 0) return;
+  
+  let currentSlide = 0;
+  let autoInterval = null;
+  const totalSlides = slides.length;
+  
+  // Function to show specific slide
+  const showSlide = (index) => {
+    // Remove active class from all slides and indicators
+    slides.forEach(slide => slide.classList.remove('active'));
+    indicators.forEach(indicator => indicator.classList.remove('active'));
+    
+    // Add active class to current slide and indicator
+    slides[index].classList.add('active');
+    indicators[index].classList.add('active');
+    
+    currentSlide = index;
+  };
+  
+  // Auto-advance carousel
+  const autoAdvance = () => {
+    const nextSlide = (currentSlide + 1) % totalSlides;
+    showSlide(nextSlide);
+  };
+  
+  // Start auto-advancement
+  const startAutoAdvance = () => {
+    autoInterval = setInterval(autoAdvance, 4000); // Change slide every 4 seconds
+  };
+  
+  // Stop auto-advancement
+  const stopAutoAdvance = () => {
+    if (autoInterval) {
+      clearInterval(autoInterval);
+      autoInterval = null;
+    }
+  };
+  
+  // Add click handlers to indicators
+  indicators.forEach((indicator, index) => {
+    on(indicator, 'click', () => {
+      showSlide(index);
+    });
+  });
+  
+  // Start auto-advancement
+  startAutoAdvance();
+  
+  // Pause on hover
+  on(carousel, 'mouseenter', stopAutoAdvance);
+  
+  // Resume on mouse leave
+  on(carousel, 'mouseleave', startAutoAdvance);
 };
 
 // Initialize smooth scrolling
@@ -1812,8 +1815,6 @@ window.app = {
   openModal,
   closeModal,
   getCurrentUser: () => currentUser,
-  getCurrentTheme: () => currentTheme,
-  toggleTheme,
   utils,
   api,
   i18n

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi" data-theme="light">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -107,11 +107,6 @@
                 
                 <!-- User Actions -->
                 <div class="user-actions">
-                    <!-- Theme Toggle -->
-                    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
-                        <i class="fas fa-moon"></i>
-                    </button>
-                    
                     <!-- Language Toggle -->
                     <button class="lang-toggle" id="lang-toggle" aria-label="Change language">
                         <i class="fas fa-globe"></i>
@@ -331,45 +326,55 @@
             </div>
         </section>
 
-        <!-- Statistics -->
-        <section class="stats">
+        <!-- Pet Showcase Carousel -->
+        <section class="pet-showcase">
             <div class="container">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-users"></i>
+                <div class="carousel-container">
+                    <div class="carousel-wrapper" id="pet-carousel">
+                        <div class="carousel-slide active">
+                            <img src="https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=600&h=400&fit=crop" alt="Chó Golden Retriever" class="carousel-image">
+                            <div class="carousel-caption">
+                                <h3>Golden Retriever</h3>
+                                <p>Giống chó thân thiện và thông minh</p>
+                            </div>
                         </div>
-                        <div class="stat-content">
-                            <div class="stat-number">50,000+</div>
-                            <div class="stat-label" data-i18n="stats.users">Thành viên</div>
+                        <div class="carousel-slide">
+                            <img src="https://images.unsplash.com/photo-1574158622682-e40e69881006?w=600&h=400&fit=crop" alt="Mèo Ba Tư" class="carousel-image">
+                            <div class="carousel-caption">
+                                <h3>Mèo Ba Tư</h3>
+                                <p>Mèo lông dài xinh đẹp và dịu dàng</p>
+                            </div>
+                        </div>
+                        <div class="carousel-slide">
+                            <img src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600&h=400&fit=crop" alt="Chó Husky" class="carousel-image">
+                            <div class="carousel-caption">
+                                <h3>Husky Siberian</h3>
+                                <p>Chó làm việc năng động và thông minh</p>
+                            </div>
+                        </div>
+                        <div class="carousel-slide">
+                            <img src="https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?w=600&h=400&fit=crop" alt="Mèo anh lông ngắn" class="carousel-image">
+                            <div class="carousel-caption">
+                                <h3>Mèo Anh Lông Ngắn</h3>
+                                <p>Giống mèo phổ biến và dễ chăm sóc</p>
+                            </div>
+                        </div>
+                        <div class="carousel-slide">
+                            <img src="https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=600&h=400&fit=crop" alt="Chó Poodle" class="carousel-image">
+                            <div class="carousel-caption">
+                                <h3>Poodle</h3>
+                                <p>Chó thông minh không rụng lông</p>
+                            </div>
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-heart"></i>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number">15,000+</div>
-                            <div class="stat-label" data-i18n="stats.pets">Thú cưng</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-handshake"></i>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number">30,000+</div>
-                            <div class="stat-label" data-i18n="stats.transactions">Giao dịch</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number">63</div>
-                            <div class="stat-label" data-i18n="stats.provinces">Tỉnh thành</div>
-                        </div>
+                    
+                    <!-- Carousel indicators -->
+                    <div class="carousel-indicators">
+                        <span class="indicator active" data-slide="0"></span>
+                        <span class="indicator" data-slide="1"></span>
+                        <span class="indicator" data-slide="2"></span>
+                        <span class="indicator" data-slide="3"></span>
+                        <span class="indicator" data-slide="4"></span>
                     </div>
                 </div>
             </div>
