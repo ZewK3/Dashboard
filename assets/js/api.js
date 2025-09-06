@@ -10,7 +10,194 @@ const CONFIG = {
   BASE_URL: 'http://localhost:8787', // Development URL - change for production
   TIMEOUT: 30000, // 30 seconds
   MAX_RETRIES: 3,
-  RETRY_DELAY: 1000 // 1 second
+  RETRY_DELAY: 1000, // 1 second
+  USE_DEMO_MODE: true // Enable demo mode with mock data
+};
+
+// Demo data for testing
+const DEMO_DATA = {
+  users: [
+    {
+      id: 1,
+      email: 'buyer@demo.com',
+      fullName: 'Nguyễn Văn A',
+      role: 'buyer',
+      avatar: null,
+      createdAt: '2024-01-01T00:00:00Z'
+    },
+    {
+      id: 2,
+      email: 'seller@demo.com', 
+      fullName: 'Trần Thị B',
+      role: 'seller',
+      avatar: null,
+      createdAt: '2024-01-01T00:00:00Z'
+    },
+    {
+      id: 3,
+      email: 'admin@demo.com',
+      fullName: 'Admin PetMarket',
+      role: 'admin',
+      avatar: null,
+      createdAt: '2024-01-01T00:00:00Z'
+    }
+  ],
+  pets: [
+    {
+      id: 1,
+      slug: 'cho-golden-retriever-dep-trai',
+      title: 'Chó Golden Retriever đẹp trai',
+      description: 'Chú Golden Retriever 2 tuổi, rất thông minh và ngoan ngoãn. Đã tiêm phòng đầy đủ.',
+      price: 15000000,
+      species: 'dog',
+      breed: 'Golden Retriever',
+      age: 24,
+      gender: 'male',
+      location: 'Hồ Chí Minh',
+      images: ['https://via.placeholder.com/400x300/FFB6C1/FFFFFF?text=Golden+Retriever'],
+      sellerId: 2,
+      status: 'available',
+      createdAt: '2024-01-15T00:00:00Z'
+    },
+    {
+      id: 2,
+      slug: 'meo-persian-trang-xinh',
+      title: 'Mèo Persian trắng xinh xắn',
+      description: 'Mèo Persian trắng muốt, lông dài mượt mà. Rất hiền lành và thân thiện.',
+      price: 8000000,
+      species: 'cat', 
+      breed: 'Persian',
+      age: 18,
+      gender: 'female',
+      location: 'Hà Nội',
+      images: ['https://via.placeholder.com/400x300/FFB6C1/FFFFFF?text=Persian+Cat'],
+      sellerId: 2,
+      status: 'available',
+      createdAt: '2024-01-20T00:00:00Z'
+    },
+    {
+      id: 3,
+      slug: 'chim-canary-vang-chen',
+      title: 'Chim Canary vàng chến',
+      description: 'Chim Canary giọng hót hay, màu vàng rực rỡ. Nuôi trong nhà rất dễ.',
+      price: 1500000,
+      species: 'bird',
+      breed: 'Canary',
+      age: 12,
+      gender: 'male',
+      location: 'Đà Nẵng',
+      images: ['https://via.placeholder.com/400x300/FFB6C1/FFFFFF?text=Canary+Bird'],
+      sellerId: 2,
+      status: 'available',
+      createdAt: '2024-01-25T00:00:00Z'
+    }
+  ],
+  currentUser: null,
+  authToken: null
+};
+
+// Mock API delay to simulate network
+const mockDelay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Mock API functions
+const mockAPI = {
+  // Auth endpoints
+  auth: {
+    register: async (userData) => {
+      await mockDelay();
+      const newUser = {
+        id: DEMO_DATA.users.length + 1,
+        ...userData,
+        role: 'buyer',
+        avatar: null,
+        createdAt: new Date().toISOString()
+      };
+      DEMO_DATA.users.push(newUser);
+      const token = `demo_token_${newUser.id}`;
+      DEMO_DATA.authToken = token;
+      DEMO_DATA.currentUser = newUser;
+      return { success: true, user: newUser, token };
+    },
+    
+    login: async (credentials) => {
+      await mockDelay();
+      const user = DEMO_DATA.users.find(u => u.email === credentials.email);
+      if (!user) {
+        throw new Error('Email hoặc mật khẩu không đúng');
+      }
+      const token = `demo_token_${user.id}`;
+      DEMO_DATA.authToken = token;
+      DEMO_DATA.currentUser = user;
+      return { success: true, user, token };
+    },
+    
+    logout: async () => {
+      await mockDelay(200);
+      DEMO_DATA.authToken = null;
+      DEMO_DATA.currentUser = null;
+      return { success: true };
+    },
+    
+    me: async () => {
+      await mockDelay(300);
+      if (!DEMO_DATA.authToken || !DEMO_DATA.currentUser) {
+        throw new Error('Chưa đăng nhập');
+      }
+      return { success: true, user: DEMO_DATA.currentUser };
+    }
+  },
+  
+  // Pets endpoints
+  pets: {
+    getPets: async (filters = {}) => {
+      await mockDelay();
+      let pets = [...DEMO_DATA.pets];
+      
+      if (filters.species) {
+        pets = pets.filter(p => p.species === filters.species);
+      }
+      if (filters.search) {
+        pets = pets.filter(p => 
+          p.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+          p.description.toLowerCase().includes(filters.search.toLowerCase())
+        );
+      }
+      
+      return {
+        success: true,
+        pets,
+        total: pets.length,
+        page: 1,
+        limit: 20
+      };
+    },
+    
+    getPet: async (slug) => {
+      await mockDelay();
+      const pet = DEMO_DATA.pets.find(p => p.slug === slug);
+      if (!pet) {
+        throw new Error('Không tìm thấy thú cưng');
+      }
+      return { success: true, pet };
+    },
+    
+    createPet: async (petData) => {
+      await mockDelay(800);
+      if (!DEMO_DATA.currentUser || DEMO_DATA.currentUser.role !== 'seller') {
+        throw new Error('Chỉ người bán mới có thể đăng tin');
+      }
+      const newPet = {
+        id: DEMO_DATA.pets.length + 1,
+        slug: petData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+        ...petData,
+        sellerId: DEMO_DATA.currentUser.id,
+        status: 'available',
+        createdAt: new Date().toISOString()
+      };
+      DEMO_DATA.pets.push(newPet);
+      return { success: true, pet: newPet };
+    }
+  }
 };
 
 // Request interceptors
@@ -234,6 +421,10 @@ export const api = {
 export const authAPI = {
   // Register new user
   register: async (userData) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      return mockAPI.auth.register(userData);
+    }
+    
     const response = await api.post('/api/auth/register', userData);
     
     if (response.token) {
@@ -245,6 +436,10 @@ export const authAPI = {
 
   // Login user
   login: async (credentials) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      return mockAPI.auth.login(credentials);
+    }
+    
     const response = await api.post('/api/auth/login', credentials);
     
     if (response.token) {
@@ -256,6 +451,10 @@ export const authAPI = {
 
   // Logout user
   logout: async () => {
+    if (CONFIG.USE_DEMO_MODE) {
+      return mockAPI.auth.logout();
+    }
+    
     try {
       await api.post('/api/auth/logout');
     } finally {
@@ -265,16 +464,31 @@ export const authAPI = {
 
   // Get current user
   me: async () => {
+    if (CONFIG.USE_DEMO_MODE) {
+      return mockAPI.auth.me();
+    }
+    
     return api.get('/api/auth/me');
   },
 
   // Update profile
   updateProfile: async (profileData) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      await mockDelay();
+      DEMO_DATA.currentUser = { ...DEMO_DATA.currentUser, ...profileData };
+      return { success: true, user: DEMO_DATA.currentUser };
+    }
+    
     return api.put('/api/auth/profile', profileData);
   },
 
   // Change password
   changePassword: async (passwordData) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      await mockDelay();
+      return { success: true, message: 'Mật khẩu đã được thay đổi' };
+    }
+    
     return api.put('/api/auth/password', passwordData);
   }
 };
@@ -283,20 +497,90 @@ export const authAPI = {
 export const petsAPI = {
   // Get pets with filters
   getPets: async (filters = {}) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      return mockAPI.pets.getPets(filters);
+    }
+    
     return api.get('/api/pets', filters);
   },
 
   // Get pet by slug
   getPet: async (slug) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      return mockAPI.pets.getPet(slug);
+    }
+    
     return api.get(`/api/pets/${slug}`);
   },
 
   // Create new pet listing (seller only)
   createPet: async (petData) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      return mockAPI.pets.createPet(petData);
+    }
+    
     return api.post('/api/seller/pets', petData);
   },
 
   // Update pet listing (seller only)
+  updatePet: async (petId, petData) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      await mockDelay();
+      const petIndex = DEMO_DATA.pets.findIndex(p => p.id === petId);
+      if (petIndex === -1) {
+        throw new Error('Không tìm thấy thú cưng');
+      }
+      DEMO_DATA.pets[petIndex] = { ...DEMO_DATA.pets[petIndex], ...petData };
+      return { success: true, pet: DEMO_DATA.pets[petIndex] };
+    }
+    
+    return api.put(`/api/seller/pets/${petId}`, petData);
+  },
+
+  // Delete pet listing (seller only)
+  deletePet: async (petId) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      await mockDelay();
+      const petIndex = DEMO_DATA.pets.findIndex(p => p.id === petId);
+      if (petIndex === -1) {
+        throw new Error('Không tìm thấy thú cưng');
+      }
+      DEMO_DATA.pets.splice(petIndex, 1);
+      return { success: true };
+    }
+    
+    return api.delete(`/api/seller/pets/${petId}`);
+  },
+
+  // Search pets
+  searchPets: async (query, filters = {}) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      return mockAPI.pets.getPets({ ...filters, search: query });
+    }
+    
+    return api.get('/api/pets/search', { q: query, ...filters });
+  },
+
+  // Add to favorites
+  addFavorite: async (petId) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      await mockDelay();
+      return { success: true, message: 'Đã thêm vào yêu thích' };
+    }
+    
+    return api.post(`/api/pets/${petId}/favorite`);
+  },
+
+  // Remove from favorites
+  removeFavorite: async (petId) => {
+    if (CONFIG.USE_DEMO_MODE) {
+      await mockDelay();
+      return { success: true, message: 'Đã xóa khỏi yêu thích' };
+    }
+    
+    return api.delete(`/api/pets/${petId}/favorite`);
+  }
+};
   updatePet: async (petId, petData) => {
     return api.put(`/api/seller/pets/${petId}`, petData);
   },

@@ -17,7 +17,8 @@ const CONFIG = {
   API_BASE_URL: window.location.hostname === 'localhost' ? 'http://localhost:8787' : 'https://api.petmarket.vn',
   DEFAULT_LANGUAGE: 'vi',
   DEBOUNCE_DELAY: 300,
-  TOAST_DURATION: 5000
+  TOAST_DURATION: 5000,
+  DEMO_MODE: true // Enable demo mode for testing
 };
 
 // Initialize application
@@ -27,6 +28,13 @@ const init = async () => {
   try {
     // Set API base URL
     setBaseUrl(CONFIG.API_BASE_URL);
+    
+    // Show demo mode notification
+    if (CONFIG.DEMO_MODE) {
+      setTimeout(() => {
+        showToast('🎮 Chế độ demo đang hoạt động - sử dụng dữ liệu mẫu', 'info');
+      }, 1000);
+    }
     
     // Initialize internationalization
     await i18n.init(CONFIG.DEFAULT_LANGUAGE);
@@ -55,11 +63,13 @@ const init = async () => {
     // Initialize page-specific functionality
     initPageSpecific();
     
-    // Health check
-    await performHealthCheck();
+    // Health check (skip in demo mode)
+    if (!CONFIG.DEMO_MODE) {
+      await performHealthCheck();
+    }
     
-    // Seed development data if needed
-    if (window.location.hostname === 'localhost') {
+    // Seed development data if needed (skip in demo mode)
+    if (window.location.hostname === 'localhost' && !CONFIG.DEMO_MODE) {
       await seedDevelopmentData();
     }
     
@@ -68,7 +78,7 @@ const init = async () => {
     // Dispatch app initialized event
     window.dispatchEvent(new CustomEvent('app:initialized'));
     
-    console.log('Pet Marketplace application initialized successfully');
+    console.log('Pet Marketplace application initialized successfully' + (CONFIG.DEMO_MODE ? ' (Demo Mode)' : ''));
     
   } catch (error) {
     console.error('Failed to initialize application:', error);
@@ -1380,7 +1390,7 @@ window.saveSystemSettings = () => {
   showToast('Đã lưu cài đặt hệ thống! ⚙️', 'success');
 };
 
-// Chat functions
+// Enhanced Chat functions with better mobile support
 window.sendChatMessage = () => {
   const chatInput = $('#chat-input');
   const chatMessages = $('#chat-messages');
@@ -1390,15 +1400,18 @@ window.sendChatMessage = () => {
   const message = chatInput.value.trim();
   if (!message) return;
   
-  // Add user message
+  // Add typing indicator for better UX
+  showTypingIndicator();
+  
+  // Add user message with enhanced mobile styling
   const messageHTML = `
-    <div class="message user-message">
+    <div class="message user-message" style="animation: slideInRight 0.3s ease-out;">
       <div class="message-avatar">
-        <i class="fas fa-user"></i>
+        <i class="fas fa-user cute-icon"></i>
       </div>
       <div class="message-content">
         <div class="message-header">
-          <span class="sender-name">Bạn</span>
+          <span class="sender-name">${currentUser?.fullName || 'Bạn'}</span>
           <span class="message-time">${new Date().toLocaleTimeString('vi-VN')}</span>
         </div>
         <div class="message-text">
@@ -1411,22 +1424,35 @@ window.sendChatMessage = () => {
   chatMessages.insertAdjacentHTML('beforeend', messageHTML);
   chatInput.value = '';
   
-  // Scroll to bottom
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  // Auto-scroll with smooth behavior
+  chatMessages.scrollTo({
+    top: chatMessages.scrollHeight,
+    behavior: 'smooth'
+  });
   
-  // Simulate support response
+  // Hide mobile keyboard on send
+  if (window.innerWidth <= 768) {
+    chatInput.blur();
+    setTimeout(() => chatInput.focus(), 100);
+  }
+  
+  // Enhanced support response system
   setTimeout(() => {
+    hideTypingIndicator();
+    
     const responses = [
       'Cảm ơn bạn đã liên hệ! Tôi sẽ hỗ trợ bạn ngay bây giờ 🐾',
       'Tôi hiểu vấn đề của bạn. Hãy để tôi kiểm tra thông tin 💕',
       'Đó là một câu hỏi hay! Tôi sẽ giải đáp chi tiết cho bạn 🌟',
-      'Bạn có thể cung cấp thêm thông tin để tôi hỗ trợ tốt hơn không? 🤗'
+      'Bạn có thể cung cấp thêm thông tin để tôi hỗ trợ tốt hơn không? 🤗',
+      'Tôi sẽ giúp bạn giải quyết vấn đề này ngay thôi! 💖',
+      'Đây là vấn đề phổ biến, tôi có kinh nghiệm xử lý 🏆'
     ];
     
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
     
     const supportMessageHTML = `
-      <div class="message support-message">
+      <div class="message support-message" style="animation: slideInLeft 0.3s ease-out;">
         <div class="message-avatar">
           <i class="fas fa-headset cute-icon"></i>
         </div>
@@ -1443,39 +1469,110 @@ window.sendChatMessage = () => {
     `;
     
     chatMessages.insertAdjacentHTML('beforeend', supportMessageHTML);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTo({
+      top: chatMessages.scrollHeight,
+      behavior: 'smooth'
+    });
+    
+    // Play notification sound (if enabled)
+    playNotificationSound();
+    
   }, 1000 + Math.random() * 2000);
 };
 
+// Enhanced typing indicator
+const showTypingIndicator = () => {
+  const chatMessages = $('#chat-messages');
+  if (!chatMessages) return;
+  
+  const typingHTML = `
+    <div class="message support-message typing-indicator" id="typing-indicator">
+      <div class="message-avatar">
+        <i class="fas fa-headset cute-icon"></i>
+      </div>
+      <div class="message-content">
+        <div class="message-header">
+          <span class="sender-name">Hỗ trợ viên PetMarket</span>
+          <span class="message-time">đang gõ...</span>
+        </div>
+        <div class="message-text">
+          <div class="typing-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  chatMessages.insertAdjacentHTML('beforeend', typingHTML);
+  chatMessages.scrollTo({
+    top: chatMessages.scrollHeight,
+    behavior: 'smooth'
+  });
+};
+
+const hideTypingIndicator = () => {
+  const typingIndicator = $('#typing-indicator');
+  if (typingIndicator) {
+    typingIndicator.remove();
+  }
+};
+
+// Enhanced quick message function
 window.sendQuickMessage = (message) => {
   const chatInput = $('#chat-input');
   if (chatInput) {
     chatInput.value = message;
     sendChatMessage();
+    
+    // Provide haptic feedback on mobile
+    if (navigator.vibrate && window.innerWidth <= 768) {
+      navigator.vibrate(50);
+    }
   }
 };
 
+// Enhanced file attachment with mobile support
 window.attachFile = () => {
-  showToast('Tính năng đính kèm file đang được phát triển 📎', 'info');
+  if (window.innerWidth <= 768) {
+    showToast('📎 Tính năng đính kèm file sẽ có trong phiên bản tiếp theo!', 'info');
+  } else {
+    showToast('Tính năng đính kèm file đang được phát triển 📎', 'info');
+  }
+  
+  // Future: implement file picker
+  // const input = document.createElement('input');
+  // input.type = 'file';
+  // input.accept = 'image/*,.pdf,.doc,.docx';
+  // input.click();
 };
 
+// Enhanced emoji picker
 window.addEmoji = () => {
   const chatInput = $('#chat-input');
   if (chatInput) {
-    const emojis = ['🐶', '🐱', '🐦', '🐠', '🐰', '🐾', '💕', '😊', '❤️', '🌟'];
+    const emojis = ['🐶', '🐱', '🐦', '🐠', '🐰', '🐾', '💕', '😊', '❤️', '🌟', '🤗', '😍', '🥰', '💖'];
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
     chatInput.value += ` ${randomEmoji}`;
     chatInput.focus();
+    
+    // Show emoji picker on mobile (future enhancement)
+    if (window.innerWidth <= 768) {
+      showToast(`Đã thêm ${randomEmoji}`, 'success');
+    }
   }
 };
 
+// Enhanced end chat function
 window.endChat = () => {
   showToast('Cảm ơn bạn đã sử dụng dịch vụ hỗ trợ! 💖', 'success');
   const chatMessages = $('#chat-messages');
   if (chatMessages) {
     setTimeout(() => {
       const goodbyeMessage = `
-        <div class="message support-message">
+        <div class="message support-message" style="animation: slideInLeft 0.3s ease-out;">
           <div class="message-avatar">
             <i class="fas fa-headset cute-icon"></i>
           </div>
@@ -1486,13 +1583,43 @@ window.endChat = () => {
             </div>
             <div class="message-text">
               <p>Cảm ơn bạn đã liên hệ với PetMarket! Chúc bạn có những trải nghiệm tuyệt vời với những người bạn thú cưng 🐾💕</p>
+              <p><em>Đánh giá chất lượng hỗ trợ: ⭐⭐⭐⭐⭐</em></p>
             </div>
           </div>
         </div>
       `;
       chatMessages.insertAdjacentHTML('beforeend', goodbyeMessage);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+      chatMessages.scrollTo({
+        top: chatMessages.scrollHeight,
+        behavior: 'smooth'
+      });
     }, 500);
+  }
+};
+
+// Notification sound (soft beep)
+const playNotificationSound = () => {
+  if (typeof Audio !== 'undefined') {
+    try {
+      // Create a simple beep sound using Web Audio API
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (e) {
+      // Silent fail if audio not supported
+    }
   }
 };
 
