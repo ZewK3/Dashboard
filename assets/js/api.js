@@ -579,8 +579,9 @@ export const petsAPI = {
     }
     
     return api.delete(`/api/pets/${petId}/favorite`);
-  }
-};
+  },
+
+  // Update pet listing (seller only)
   updatePet: async (petId, petData) => {
     return api.put(`/api/seller/pets/${petId}`, petData);
   },
