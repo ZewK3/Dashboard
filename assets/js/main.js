@@ -176,6 +176,7 @@ const initAuth = async () => {
 const updateAuthUI = (isLoggedIn) => {
   const authButtons = $('#auth-buttons');
   const userMenu = $('#user-menu');
+  const adminNav = $('#admin-nav');
   
   if (isLoggedIn && currentUser) {
     // Hide auth buttons, show user menu
@@ -188,7 +189,7 @@ const updateAuthUI = (isLoggedIn) => {
       const userName = $('#user-name');
       
       if (userAvatar) {
-        userAvatar.src = currentUser.avatarUrl || 'https://via.placeholder.com/32/ccc/666?text=U';
+        userAvatar.src = currentUser.avatarUrl || 'https://via.placeholder.com/32/ff69b4/ffffff?text=🐾';
         userAvatar.alt = currentUser.fullName;
       }
       
@@ -199,10 +200,16 @@ const updateAuthUI = (isLoggedIn) => {
       // Update profile links based on role
       updateNavigationByRole(currentUser.role);
     }
+    
+    // Show admin navigation if user is admin
+    if (adminNav) {
+      adminNav.style.display = currentUser.role === 'admin' ? 'block' : 'none';
+    }
   } else {
     // Show auth buttons, hide user menu
     if (authButtons) authButtons.style.display = 'flex';
     if (userMenu) userMenu.style.display = 'none';
+    if (adminNav) adminNav.style.display = 'none';
   }
 };
 
@@ -214,21 +221,31 @@ const updateNavigationByRole = (role) => {
   if (profileLink) {
     switch (role) {
       case 'seller':
-        profileLink.href = '#seller';
+        profileLink.href = '#seller-portal';
+        profileLink.onclick = () => checkAuthentication('seller') && showSection('seller-portal');
         break;
       case 'admin':
-        profileLink.href = '#admin';
+        profileLink.href = '#admin-portal';
+        profileLink.onclick = () => checkAuthentication('admin') && showSection('admin-portal');
         break;
       case 'support':
-        profileLink.href = '#support';
+        profileLink.href = '#chat-portal';
+        profileLink.onclick = () => showSection('chat-portal');
         break;
       default:
-        profileLink.href = '#buyer';
+        profileLink.href = '#buyer-portal';
+        profileLink.onclick = () => showSection('buyer-portal');
     }
   }
   
   if (ordersLink) {
-    ordersLink.href = role === 'seller' ? '#seller' : '#buyer';
+    if (role === 'seller') {
+      ordersLink.href = '#seller-portal';
+      ordersLink.onclick = () => checkAuthentication('seller') && showSection('seller-portal');
+    } else {
+      ordersLink.href = '#buyer-portal';
+      ordersLink.onclick = () => showSection('buyer-portal');
+    }
   }
 };
 
@@ -483,7 +500,19 @@ const showSection = (sectionId) => {
   if (sectionId === 'buyer-portal') {
     initBuyerPortal();
   } else if (sectionId === 'seller-portal') {
-    initSellerPortal();
+    if (checkAuthentication('seller')) {
+      initSellerPortal();
+    } else {
+      return; // Don't proceed if authentication failed
+    }
+  } else if (sectionId === 'admin-portal') {
+    if (checkAuthentication('admin')) {
+      initAdminPortal();
+    } else {
+      return; // Don't proceed if authentication failed
+    }
+  } else if (sectionId === 'chat-portal') {
+    initChatPortal();
   }
 
   // Close mobile menu if open
@@ -1270,15 +1299,48 @@ const toggleOrdersSection = () => {
   }
 };
 
-// Placeholder pet interaction functions
+// Check authentication before accessing certain sections
+window.checkAuthentication = (requiredRole) => {
+  if (!currentUser) {
+    showToast('Bạn cần đăng nhập để truy cập tính năng này! 💕', 'warning');
+    showAuthModal('login');
+    return false;
+  }
+  
+  if (requiredRole === 'seller' && currentUser.role !== 'seller' && currentUser.role !== 'admin') {
+    showToast('Bạn cần có quyền người bán để đăng tin! 🐾', 'warning');
+    return false;
+  }
+  
+  if (requiredRole === 'admin' && currentUser.role !== 'admin') {
+    showToast('Bạn không có quyền truy cập trang quản trị! 👑', 'error');
+    return false;
+  }
+  
+  return true;
+};
+
+// Authentication-required pet actions
 window.toggleFavorite = (petId) => {
+  if (!currentUser) {
+    showToast('Bạn cần đăng nhập để yêu thích thú cưng! 💕', 'warning');
+    showAuthModal('login');
+    return;
+  }
+  
   console.log('Toggle favorite for pet:', petId);
-  showToast('Tính năng đang được phát triển', 'info');
+  showToast('Đã thêm vào danh sách yêu thích! 💖', 'success');
 };
 
 window.addToCart = (petId) => {
+  if (!currentUser) {
+    showToast('Bạn cần đăng nhập để mua thú cưng! 🐾', 'warning');
+    showAuthModal('login');
+    return;
+  }
+  
   console.log('Add to cart pet:', petId);
-  showToast('Đã thêm vào giỏ hàng', 'success');
+  showToast('Đã thêm vào giỏ hàng! 🛒💕', 'success');
 };
 
 window.viewPetDetails = (petId) => {
@@ -1286,21 +1348,208 @@ window.viewPetDetails = (petId) => {
   openModal('pet-detail-modal');
 };
 
-// Placeholder seller functions
+// Placeholder seller functions with authentication
 window.editListing = (listingId) => {
+  if (!checkAuthentication('seller')) return;
   console.log('Edit listing:', listingId);
-  showToast('Tính năng đang được phát triển', 'info');
+  showToast('Tính năng đang được phát triển 🔧', 'info');
 };
 
 window.toggleListingStatus = (listingId) => {
+  if (!checkAuthentication('seller')) return;
   console.log('Toggle listing status:', listingId);
-  showToast('Tính năng đang được phát triển', 'info');
+  showToast('Tính năng đang được phát triển 🔧', 'info');
 };
 
 window.deleteListing = (listingId) => {
+  if (!checkAuthentication('seller')) return;
   console.log('Delete listing:', listingId);
-  showToast('Tính năng đang được phát triển', 'info');
+  showToast('Tính năng đang được phát triển 🔧', 'info');
 };
+
+// Admin functions
+window.loadPendingListings = () => {
+  if (!checkAuthentication('admin')) return;
+  console.log('Loading pending listings...');
+  showToast('Đang tải danh sách chờ duyệt... 👑', 'info');
+};
+
+window.saveSystemSettings = () => {
+  if (!checkAuthentication('admin')) return;
+  console.log('Saving system settings...');
+  showToast('Đã lưu cài đặt hệ thống! ⚙️', 'success');
+};
+
+// Chat functions
+window.sendChatMessage = () => {
+  const chatInput = $('#chat-input');
+  const chatMessages = $('#chat-messages');
+  
+  if (!chatInput || !chatMessages) return;
+  
+  const message = chatInput.value.trim();
+  if (!message) return;
+  
+  // Add user message
+  const messageHTML = `
+    <div class="message user-message">
+      <div class="message-avatar">
+        <i class="fas fa-user"></i>
+      </div>
+      <div class="message-content">
+        <div class="message-header">
+          <span class="sender-name">Bạn</span>
+          <span class="message-time">${new Date().toLocaleTimeString('vi-VN')}</span>
+        </div>
+        <div class="message-text">
+          <p>${message}</p>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  chatMessages.insertAdjacentHTML('beforeend', messageHTML);
+  chatInput.value = '';
+  
+  // Scroll to bottom
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  
+  // Simulate support response
+  setTimeout(() => {
+    const responses = [
+      'Cảm ơn bạn đã liên hệ! Tôi sẽ hỗ trợ bạn ngay bây giờ 🐾',
+      'Tôi hiểu vấn đề của bạn. Hãy để tôi kiểm tra thông tin 💕',
+      'Đó là một câu hỏi hay! Tôi sẽ giải đáp chi tiết cho bạn 🌟',
+      'Bạn có thể cung cấp thêm thông tin để tôi hỗ trợ tốt hơn không? 🤗'
+    ];
+    
+    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+    
+    const supportMessageHTML = `
+      <div class="message support-message">
+        <div class="message-avatar">
+          <i class="fas fa-headset cute-icon"></i>
+        </div>
+        <div class="message-content">
+          <div class="message-header">
+            <span class="sender-name">Hỗ trợ viên PetMarket</span>
+            <span class="message-time">${new Date().toLocaleTimeString('vi-VN')}</span>
+          </div>
+          <div class="message-text">
+            <p>${randomResponse}</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    chatMessages.insertAdjacentHTML('beforeend', supportMessageHTML);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }, 1000 + Math.random() * 2000);
+};
+
+window.sendQuickMessage = (message) => {
+  const chatInput = $('#chat-input');
+  if (chatInput) {
+    chatInput.value = message;
+    sendChatMessage();
+  }
+};
+
+window.attachFile = () => {
+  showToast('Tính năng đính kèm file đang được phát triển 📎', 'info');
+};
+
+window.addEmoji = () => {
+  const chatInput = $('#chat-input');
+  if (chatInput) {
+    const emojis = ['🐶', '🐱', '🐦', '🐠', '🐰', '🐾', '💕', '😊', '❤️', '🌟'];
+    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    chatInput.value += ` ${randomEmoji}`;
+    chatInput.focus();
+  }
+};
+
+window.endChat = () => {
+  showToast('Cảm ơn bạn đã sử dụng dịch vụ hỗ trợ! 💖', 'success');
+  const chatMessages = $('#chat-messages');
+  if (chatMessages) {
+    setTimeout(() => {
+      const goodbyeMessage = `
+        <div class="message support-message">
+          <div class="message-avatar">
+            <i class="fas fa-headset cute-icon"></i>
+          </div>
+          <div class="message-content">
+            <div class="message-header">
+              <span class="sender-name">Hỗ trợ viên PetMarket</span>
+              <span class="message-time">${new Date().toLocaleTimeString('vi-VN')}</span>
+            </div>
+            <div class="message-text">
+              <p>Cảm ơn bạn đã liên hệ với PetMarket! Chúc bạn có những trải nghiệm tuyệt vời với những người bạn thú cưng 🐾💕</p>
+            </div>
+          </div>
+        </div>
+      `;
+      chatMessages.insertAdjacentHTML('beforeend', goodbyeMessage);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }, 500);
+  }
+};
+
+// Placeholder pet interaction functions
+// Add admin tab functionality
+window.addEventListener('DOMContentLoaded', () => {
+  // Setup admin tabs
+  const tabBtns = $$('.tab-btn');
+  tabBtns.forEach(btn => {
+    on(btn, 'click', () => {
+      // Remove active class from all tabs and content
+      $$('.tab-btn').forEach(b => b.classList.remove('active'));
+      $$('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      // Add active class to clicked tab
+      btn.classList.add('active');
+      
+      // Show corresponding content
+      const tabId = btn.dataset.tab;
+      const tabContent = $(`#${tabId}`);
+      if (tabContent) {
+        tabContent.classList.add('active');
+      }
+    });
+  });
+  
+  // Setup chat input enter key
+  const chatInput = $('#chat-input');
+  if (chatInput) {
+    on(chatInput, 'keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendChatMessage();
+      }
+    });
+  }
+  
+  // Setup chat topic selection
+  const chatOptionBtns = $$('.chat-option-btn');
+  chatOptionBtns.forEach(btn => {
+    on(btn, 'click', () => {
+      chatOptionBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      const topic = btn.dataset.topic;
+      const topicMessages = {
+        general: 'Tôi cần hỗ trợ chung về PetMarket',
+        buying: 'Tôi muốn tìm hiểu về việc mua thú cưng',
+        selling: 'Tôi cần hỗ trợ đăng bán thú cưng',
+        technical: 'Tôi gặp vấn đề kỹ thuật với website'
+      };
+      
+      if (topicMessages[topic]) {
+        sendQuickMessage(topicMessages[topic]);
+      }
+    });
+  });
+});
 
 const loadSellerOrders = () => {
   console.log('Loading seller orders...');
@@ -1318,12 +1567,69 @@ const initSellerPage = () => {
   console.log('Seller page initialized');
 };
 
-const initAdminPage = () => {
-  console.log('Admin page initialized');
+// Initialize admin portal functionality  
+const initAdminPortal = () => {
+  if (window.adminPortalInitialized) return;
+  window.adminPortalInitialized = true;
+
+  console.log('Admin portal initialized');
+  showToast('Chào mừng đến trang quản trị! 👑', 'success');
+  
+  // Load admin statistics
+  loadAdminStats();
 };
 
-const initSupportPage = () => {
-  console.log('Support page initialized');
+// Initialize chat portal functionality
+const initChatPortal = () => {
+  if (window.chatPortalInitialized) return;
+  window.chatPortalInitialized = true;
+
+  console.log('Chat portal initialized');
+  showToast('Chào mừng đến trang hỗ trợ! 💬', 'success');
+  
+  // Update user name in chat if logged in
+  const chatUserName = $('#chat-user-name');
+  if (chatUserName && currentUser) {
+    chatUserName.textContent = currentUser.fullName || 'Khách hàng';
+  }
+};
+
+// Load admin statistics
+const loadAdminStats = async () => {
+  try {
+    // Mock data for demonstration
+    const stats = {
+      totalUsers: 1250,
+      totalPets: 856,
+      pendingApproval: 23,
+      revenueToday: 5420000
+    };
+    
+    updateStatElement('total-users', stats.totalUsers.toLocaleString('vi-VN'));
+    updateStatElement('total-pets', stats.totalPets.toLocaleString('vi-VN'));
+    updateStatElement('pending-approval', stats.pendingApproval);
+    updateStatElement('revenue-today', stats.revenueToday.toLocaleString('vi-VN') + ' VND');
+    
+    // Animate the numbers
+    animateStatNumbers();
+  } catch (error) {
+    console.error('Error loading admin stats:', error);
+  }
+};
+
+// Animate stat numbers with cute effect
+const animateStatNumbers = () => {
+  const statNumbers = $$('.stat-number');
+  statNumbers.forEach((element, index) => {
+    setTimeout(() => {
+      element.style.transform = 'scale(1.1)';
+      element.style.color = 'var(--pink-primary)';
+      setTimeout(() => {
+        element.style.transform = 'scale(1)';
+        element.style.color = '';
+      }, 300);
+    }, index * 200);
+  });
 };
 
 // Perform health check

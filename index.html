@@ -91,9 +91,17 @@
                         <i class="fas fa-heart"></i>
                         <span data-i18n="nav.browse">Duyệt thú cưng</span>
                     </button>
-                    <button class="nav-link nav-btn" data-section="seller-portal">
-                        <i class="fas fa-plus-circle"></i>
+                    <button class="nav-link nav-btn" data-section="seller-portal" onclick="checkAuthentication('seller')">
+                        <i class="fas fa-plus-circle cute-icon"></i>
                         <span data-i18n="nav.sell">Đăng tin</span>
+                    </button>
+                    <button class="nav-link nav-btn" data-section="admin-portal" onclick="checkAuthentication('admin')" style="display: none;" id="admin-nav">
+                        <i class="fas fa-cog cute-icon"></i>
+                        <span data-i18n="nav.admin">Quản trị</span>
+                    </button>
+                    <button class="nav-link nav-btn" data-section="chat-portal">
+                        <i class="fas fa-comments cute-icon"></i>
+                        <span data-i18n="nav.support">Hỗ trợ</span>
                     </button>
                 </nav>
                 
@@ -694,7 +702,290 @@
                 </div>
             </div>
         </section>
+
+        <!-- Admin Panel Section -->
+        <section id="admin-portal" class="page-section" style="display: none;">
+            <div class="container">
+                <div class="admin-header">
+                    <h1 class="section-title cute-icon">
+                        <i class="fas fa-crown"></i> Quản trị viên
+                    </h1>
+                    <p class="section-subtitle">Quản lý hệ thống và người dùng</p>
+                </div>
+
+                <!-- Admin Stats Dashboard -->
+                <div class="admin-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users cute-icon"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 class="stat-number" id="total-users">0</h3>
+                            <p class="stat-label">Người dùng</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-paw cute-icon"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 class="stat-number" id="total-pets">0</h3>
+                            <p class="stat-label">Tổng thú cưng</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-clock cute-icon"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 class="stat-number" id="pending-approval">0</h3>
+                            <p class="stat-label">Chờ duyệt</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line cute-icon"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 class="stat-number" id="revenue-today">0</h3>
+                            <p class="stat-label">Doanh thu hôm nay</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Controls -->
+                <div class="admin-tabs">
+                    <button class="tab-btn active" data-tab="pending-listings">
+                        <i class="fas fa-clock"></i> Tin đăng chờ duyệt
+                    </button>
+                    <button class="tab-btn" data-tab="user-management">
+                        <i class="fas fa-users"></i> Quản lý người dùng  
+                    </button>
+                    <button class="tab-btn" data-tab="reports">
+                        <i class="fas fa-flag"></i> Báo cáo vi phạm
+                    </button>
+                    <button class="tab-btn" data-tab="system-settings">
+                        <i class="fas fa-cog"></i> Cài đặt hệ thống
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content active" id="pending-listings">
+                    <div class="admin-section-header">
+                        <h3>Tin đăng chờ duyệt</h3>
+                        <div class="admin-filters">
+                            <select id="listing-type-filter">
+                                <option value="">Tất cả loại</option>
+                                <option value="dog">Chó</option>
+                                <option value="cat">Mèo</option>
+                                <option value="bird">Chim</option>
+                                <option value="other">Khác</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="loadPendingListings()">
+                                <i class="fas fa-sync"></i> Làm mới
+                            </button>
+                        </div>
+                    </div>
+                    <div class="pending-listings-grid" id="pending-listings-grid">
+                        <!-- Pending listings will be loaded here -->
+                        <div class="cute-message">
+                            <i class="fas fa-heart love-icon"></i>
+                            <p>Hiện tại không có tin đăng nào chờ duyệt</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="user-management">
+                    <div class="admin-section-header">
+                        <h3>Quản lý người dùng</h3>
+                        <div class="admin-filters">
+                            <input type="text" placeholder="Tìm kiếm người dùng..." id="user-search">
+                            <select id="user-role-filter">
+                                <option value="">Tất cả vai trò</option>
+                                <option value="buyer">Người mua</option>
+                                <option value="seller">Người bán</option>
+                                <option value="admin">Quản trị</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="users-table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Người dùng</th>
+                                    <th>Email</th>
+                                    <th>Vai trò</th>
+                                    <th>Trạng thái</th>
+                                    <th>Ngày tham gia</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <!-- Users will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="reports">
+                    <div class="admin-section-header">
+                        <h3>Báo cáo vi phạm</h3>
+                        <div class="admin-filters">
+                            <select id="report-status-filter">
+                                <option value="">Tất cả</option>
+                                <option value="pending">Chờ xử lý</option>
+                                <option value="resolved">Đã xử lý</option>
+                                <option value="dismissed">Đã bỏ qua</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="reports-list" id="reports-list">
+                        <!-- Reports will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="tab-content" id="system-settings">
+                    <div class="admin-section-header">
+                        <h3>Cài đặt hệ thống</h3>
+                    </div>
+                    <div class="settings-form">
+                        <div class="setting-group">
+                            <label>Phí giao dịch (%)</label>
+                            <input type="number" id="transaction-fee" value="5" min="0" max="20">
+                        </div>
+                        <div class="setting-group">
+                            <label>Số tin đăng tối đa mỗi người dùng</label>
+                            <input type="number" id="max-listings" value="10" min="1" max="100">
+                        </div>
+                        <div class="setting-group">
+                            <label>Tự động duyệt tin đăng</label>
+                            <input type="checkbox" id="auto-approve">
+                        </div>
+                        <button class="btn btn-primary" onclick="saveSystemSettings()">
+                            <i class="fas fa-save"></i> Lưu cài đặt
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chat Support Section -->
+        <section id="chat-portal" class="page-section" style="display: none;">
+            <div class="container">
+                <div class="chat-header">
+                    <h1 class="section-title">
+                        <i class="fas fa-comments cute-icon"></i> Hỗ trợ khách hàng
+                    </h1>
+                    <p class="section-subtitle">Liên hệ với đội ngũ hỗ trợ 24/7</p>
+                </div>
+
+                <!-- Chat Interface -->
+                <div class="chat-container">
+                    <div class="chat-sidebar">
+                        <div class="chat-user-info">
+                            <div class="user-avatar">
+                                <i class="fas fa-user cute-icon"></i>
+                            </div>
+                            <div class="user-details">
+                                <h4 id="chat-user-name">Khách hàng</h4>
+                                <span class="user-status online">
+                                    <i class="fas fa-circle"></i> Đang hoạt động
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-options">
+                            <button class="chat-option-btn" data-topic="general">
+                                <i class="fas fa-question-circle"></i> Hỗ trợ chung
+                            </button>
+                            <button class="chat-option-btn" data-topic="buying">
+                                <i class="fas fa-shopping-cart"></i> Mua thú cưng
+                            </button>
+                            <button class="chat-option-btn" data-topic="selling">
+                                <i class="fas fa-tag"></i> Bán thú cưng
+                            </button>
+                            <button class="chat-option-btn" data-topic="technical">
+                                <i class="fas fa-wrench"></i> Hỗ trợ kỹ thuật
+                            </button>
+                        </div>
+
+                        <div class="quick-actions">
+                            <h5>Hành động nhanh</h5>
+                            <button class="quick-action-btn" onclick="sendQuickMessage('Tôi cần hỗ trợ mua thú cưng')">
+                                <i class="fas fa-paw"></i> Hỗ trợ mua thú cưng
+                            </button>
+                            <button class="quick-action-btn" onclick="sendQuickMessage('Tôi muốn đăng bán thú cưng')">
+                                <i class="fas fa-plus"></i> Đăng bán thú cưng
+                            </button>
+                            <button class="quick-action-btn" onclick="sendQuickMessage('Tôi gặp vấn đề với đơn hàng')">
+                                <i class="fas fa-exclamation-triangle"></i> Vấn đề đơn hàng
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="chat-main">
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="message support-message">
+                                <div class="message-avatar">
+                                    <i class="fas fa-headset cute-icon"></i>
+                                </div>
+                                <div class="message-content">
+                                    <div class="message-header">
+                                        <span class="sender-name">Hỗ trợ viên PetMarket</span>
+                                        <span class="message-time">Bây giờ</span>
+                                    </div>
+                                    <div class="message-text">
+                                        <p>Xin chào! 🐾 Tôi là hỗ trợ viên của PetMarket. Tôi có thể giúp gì cho bạn hôm nay?</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-input-area">
+                            <div class="chat-input-container">
+                                <input type="text" id="chat-input" placeholder="Nhập tin nhắn của bạn..." autocomplete="off">
+                                <button class="btn btn-primary" id="send-message-btn" onclick="sendChatMessage()">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                            <div class="chat-tools">
+                                <button class="tool-btn" onclick="attachFile()">
+                                    <i class="fas fa-paperclip"></i> Đính kèm
+                                </button>
+                                <button class="tool-btn" onclick="addEmoji()">
+                                    <i class="fas fa-smile"></i> Emoji
+                                </button>
+                                <button class="tool-btn" onclick="endChat()">
+                                    <i class="fas fa-times"></i> Kết thúc chat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Support Info -->
+                <div class="support-info">
+                    <div class="support-card">
+                        <h4><i class="fas fa-clock cute-icon"></i> Giờ hỗ trợ</h4>
+                        <p>24/7 - Chúng tôi luôn sẵn sàng hỗ trợ bạn</p>
+                    </div>
+                    <div class="support-card">
+                        <h4><i class="fas fa-phone cute-icon"></i> Hotline</h4>
+                        <p>1900-PETMART (1900-738627)</p>
+                    </div>
+                    <div class="support-card">
+                        <h4><i class="fas fa-envelope cute-icon"></i> Email</h4>
+                        <p>support@petmarket.vn</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
+
+    <!-- Floating Chat Button -->
+    <button class="fab-cute" onclick="showSection('chat-portal')" title="Hỗ trợ trực tuyến">
+        <i class="fas fa-comments"></i>
+    </button>
 
     <!-- Footer -->
     <footer class="footer">

@@ -9,6 +9,14 @@
   --secondary-color: #4ecdc4;
   --accent-color: #45b7aa;
   
+  /* Cute Pink Theme Colors */
+  --pink-primary: #ff69b4;
+  --pink-light: #ffb6c1;
+  --pink-pastel: #ffc0cb;
+  --pink-soft: #ffe4e1;
+  --pink-accent: #ff1493;
+  --pink-warm: #ff91a4;
+  
   /* Neutral Colors - Light Theme */
   --text-primary: #2d3748;
   --text-secondary: #4a5568;
@@ -2173,5 +2181,604 @@ a:hover {
   
   .listing-actions {
     justify-content: center;
+  }
+}
+
+/* ===== CUTE PINK THEME STYLES ===== */
+
+/* Pink theme for pet cards and cute elements */
+.pet-card {
+  border: 2px solid var(--pink-light) !important;
+  background: linear-gradient(135deg, var(--pink-soft) 0%, #ffffff 100%) !important;
+  transition: all var(--transition-normal) !important;
+}
+
+.pet-card:hover {
+  border-color: var(--pink-primary) !important;
+  box-shadow: 0 8px 25px rgba(255, 105, 180, 0.15) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Pink theme for buttons */
+.btn-primary {
+  background: linear-gradient(135deg, var(--pink-primary) 0%, var(--pink-accent) 100%) !important;
+  border: none !important;
+  color: white !important;
+  transition: all var(--transition-normal) !important;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--pink-accent) 0%, var(--pink-primary) 100%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.3) !important;
+}
+
+/* Pink theme for cute icons and badges */
+.cute-icon {
+  color: var(--pink-primary) !important;
+  text-shadow: 0 0 10px rgba(255, 105, 180, 0.3) !important;
+}
+
+.cute-badge {
+  background: linear-gradient(135deg, var(--pink-pastel) 0%, var(--pink-light) 100%) !important;
+  color: var(--pink-accent) !important;
+  border-radius: var(--radius-full) !important;
+  padding: var(--space-1) var(--space-3) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-semibold) !important;
+}
+
+/* Pink theme for navigation and header */
+.nav-link:hover {
+  color: var(--pink-primary) !important;
+  background-color: var(--pink-soft) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* Pink theme for search and input elements */
+.search-input {
+  border: 2px solid var(--pink-light) !important;
+  border-radius: var(--radius-lg) !important;
+  transition: all var(--transition-normal) !important;
+}
+
+.search-input:focus {
+  border-color: var(--pink-primary) !important;
+  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.1) !important;
+}
+
+/* Pink theme for category cards */
+.category-card {
+  background: linear-gradient(135deg, var(--pink-soft) 0%, #ffffff 100%) !important;
+  border: 1px solid var(--pink-light) !important;
+  transition: all var(--transition-normal) !important;
+}
+
+.category-card:hover {
+  background: linear-gradient(135deg, var(--pink-light) 0%, var(--pink-soft) 100%) !important;
+  border-color: var(--pink-primary) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 6px 20px rgba(255, 105, 180, 0.2) !important;
+}
+
+/* Pink theme for hearts and love icons */
+.love-icon {
+  color: var(--pink-accent) !important;
+  filter: drop-shadow(0 0 8px rgba(255, 20, 147, 0.4)) !important;
+  animation: heartBeat 2s infinite !important;
+}
+
+@keyframes heartBeat {
+  0%, 50%, 100% { transform: scale(1); }
+  25%, 75% { transform: scale(1.1); }
+}
+
+/* Pink theme for success messages and cute feedback */
+.cute-message {
+  background: linear-gradient(135deg, var(--pink-soft) 0%, var(--pink-pastel) 100%) !important;
+  border: 1px solid var(--pink-light) !important;
+  color: var(--pink-accent) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: var(--space-4) !important;
+  text-align: center !important;
+}
+
+/* Pink theme for seller dashboard stats */
+.stat-card {
+  background: linear-gradient(135deg, #ffffff 0%, var(--pink-soft) 100%) !important;
+  border: 1px solid var(--pink-light) !important;
+}
+
+.stat-card .stat-number {
+  color: var(--pink-accent) !important;
+  text-shadow: 0 2px 4px rgba(255, 105, 180, 0.1) !important;
+}
+
+/* Pink theme for pagination and navigation elements */
+.pagination .page-link {
+  color: var(--pink-primary) !important;
+  border-color: var(--pink-light) !important;
+}
+
+.pagination .page-link:hover {
+  background-color: var(--pink-soft) !important;
+  border-color: var(--pink-primary) !important;
+}
+
+.pagination .page-item.active .page-link {
+  background-color: var(--pink-primary) !important;
+  border-color: var(--pink-primary) !important;
+}
+
+/* Pink theme for modals and overlays */
+.modal-content {
+  border: 2px solid var(--pink-light) !important;
+  border-radius: var(--radius-xl) !important;
+}
+
+.modal-header {
+  background: linear-gradient(135deg, var(--pink-soft) 0%, #ffffff 100%) !important;
+  border-bottom: 1px solid var(--pink-light) !important;
+}
+
+/* Pink theme for form elements */
+.form-control {
+  border: 1px solid var(--pink-light) !important;
+  border-radius: var(--radius-md) !important;
+  transition: all var(--transition-normal) !important;
+}
+
+.form-control:focus {
+  border-color: var(--pink-primary) !important;
+  box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.1) !important;
+}
+
+/* Pink theme for tags and labels */
+.tag {
+  background: var(--pink-pastel) !important;
+  color: var(--pink-accent) !important;
+  border: 1px solid var(--pink-light) !important;
+  border-radius: var(--radius-full) !important;
+  padding: var(--space-1) var(--space-3) !important;
+  font-size: var(--font-size-sm) !important;
+}
+
+/* Cute floating action button with pink theme */
+.fab-cute {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  width: 60px !important;
+  height: 60px !important;
+  background: linear-gradient(135deg, var(--pink-primary) 0%, var(--pink-accent) 100%) !important;
+  border: none !important;
+  border-radius: var(--radius-full) !important;
+  color: white !important;
+  font-size: 1.5rem !important;
+  box-shadow: 0 4px 20px rgba(255, 105, 180, 0.4) !important;
+  transition: all var(--transition-normal) !important;
+  z-index: 1000 !important;
+}
+
+.fab-cute:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.6) !important;
+}
+
+/* ===== ADMIN PANEL STYLES ===== */
+
+.admin-header {
+  text-align: center;
+  margin-bottom: var(--space-8);
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+
+.admin-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--pink-light);
+  margin-bottom: var(--space-6);
+  gap: var(--space-2);
+}
+
+.tab-btn {
+  padding: var(--space-4) var(--space-6);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  font-weight: var(--font-medium);
+}
+
+.tab-btn:hover {
+  color: var(--pink-primary);
+  background-color: var(--pink-soft);
+}
+
+.tab-btn.active {
+  color: var(--pink-accent);
+  border-bottom-color: var(--pink-primary);
+  background-color: var(--pink-soft);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.admin-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+}
+
+.admin-filters {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--pink-light);
+}
+
+.admin-table th {
+  background: linear-gradient(135deg, var(--pink-soft) 0%, var(--pink-light) 100%);
+  color: var(--pink-accent);
+  font-weight: var(--font-semibold);
+}
+
+.admin-table tr:hover {
+  background-color: var(--pink-soft);
+}
+
+.setting-group {
+  margin-bottom: var(--space-5);
+}
+
+.setting-group label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+}
+
+.pending-listings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-6);
+}
+
+/* ===== CHAT SUPPORT STYLES ===== */
+
+.chat-header {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.chat-container {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: var(--space-6);
+  height: 600px;
+  border: 2px solid var(--pink-light);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: white;
+  box-shadow: var(--shadow-lg);
+}
+
+.chat-sidebar {
+  background: linear-gradient(135deg, var(--pink-soft) 0%, #ffffff 100%);
+  padding: var(--space-6);
+  border-right: 1px solid var(--pink-light);
+}
+
+.chat-user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--pink-light);
+}
+
+.user-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--pink-primary) 0%, var(--pink-accent) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.25rem;
+}
+
+.user-details h4 {
+  margin: 0 0 var(--space-1) 0;
+  color: var(--text-primary);
+}
+
+.user-status {
+  font-size: var(--font-size-sm);
+  color: var(--success-color);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.user-status.online i {
+  color: var(--success-color);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.chat-options {
+  margin-bottom: var(--space-6);
+}
+
+.chat-option-btn {
+  display: block;
+  width: 100%;
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--pink-light);
+  background: white;
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  text-align: left;
+}
+
+.chat-option-btn:hover {
+  background: var(--pink-pastel);
+  border-color: var(--pink-primary);
+  color: var(--pink-accent);
+}
+
+.quick-actions h5 {
+  margin-bottom: var(--space-3);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.quick-action-btn {
+  display: block;
+  width: 100%;
+  padding: var(--space-2);
+  margin-bottom: var(--space-2);
+  border: none;
+  background: var(--pink-pastel);
+  color: var(--pink-accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  text-align: left;
+  font-size: var(--font-size-sm);
+}
+
+.quick-action-btn:hover {
+  background: var(--pink-light);
+  transform: translateX(5px);
+}
+
+.chat-main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: var(--space-6);
+  overflow-y: auto;
+  max-height: 500px;
+}
+
+.message {
+  display: flex;
+  margin-bottom: var(--space-4);
+  animation: messageSlide 0.3s ease-out;
+}
+
+@keyframes messageSlide {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--pink-primary) 0%, var(--pink-accent) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  margin-right: var(--space-3);
+  flex-shrink: 0;
+}
+
+.user-message .message-avatar {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  order: 2;
+  margin-left: var(--space-3);
+  margin-right: 0;
+}
+
+.message-content {
+  flex: 1;
+  max-width: 70%;
+}
+
+.user-message .message-content {
+  order: 1;
+  text-align: right;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-1);
+}
+
+.user-message .message-header {
+  flex-direction: row-reverse;
+}
+
+.sender-name {
+  font-weight: var(--font-semibold);
+  color: var(--pink-accent);
+  font-size: var(--font-size-sm);
+}
+
+.message-time {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.message-text {
+  background: var(--pink-soft);
+  border: 1px solid var(--pink-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.user-message .message-text {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.chat-input-area {
+  padding: var(--space-4);
+  border-top: 1px solid var(--pink-light);
+  background: var(--pink-soft);
+}
+
+.chat-input-container {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.chat-input-container input {
+  flex: 1;
+  padding: var(--space-3);
+  border: 1px solid var(--pink-light);
+  border-radius: var(--radius-lg);
+  background: white;
+}
+
+.chat-tools {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.tool-btn {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--pink-light);
+  background: white;
+  color: var(--pink-accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  font-size: var(--font-size-sm);
+}
+
+.tool-btn:hover {
+  background: var(--pink-pastel);
+  border-color: var(--pink-primary);
+}
+
+.support-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-6);
+  margin-top: var(--space-8);
+}
+
+.support-card {
+  background: linear-gradient(135deg, var(--pink-soft) 0%, #ffffff 100%);
+  border: 1px solid var(--pink-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  text-align: center;
+  transition: all var(--transition-normal);
+}
+
+.support-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(255, 105, 180, 0.15);
+}
+
+.support-card h4 {
+  color: var(--pink-accent);
+  margin-bottom: var(--space-3);
+}
+
+/* Mobile responsive for admin and chat */
+@media (max-width: 768px) {
+  .admin-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .chat-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: auto;
+  }
+  
+  .chat-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--pink-light);
+  }
+  
+  .admin-tabs {
+    flex-wrap: wrap;
+  }
+  
+  .tab-btn {
+    flex: 1;
+    min-width: 120px;
   }
 }

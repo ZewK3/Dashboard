@@ -325,7 +325,7 @@ export const getDirection = () => {
 };
 
 // Check if system is loaded
-export const isLoaded = () => isLoaded;
+export const isI18nLoaded = () => isLoaded;
 
 // Add new translations dynamically
 export const addTranslations = (newTranslations, lang = currentLang) => {
@@ -427,7 +427,7 @@ export default {
   formatRelativeTime,
   getLocalizedText,
   getDirection,
-  isLoaded,
+  isI18nLoaded,
   addTranslations,
   getTranslations,
   plural,
