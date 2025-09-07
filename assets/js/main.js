@@ -430,8 +430,11 @@ const initNavigation = () => {
 
   // Handle URL hash navigation
   const hash = window.location.hash.substring(1);
-  if (hash && $('#' + hash)) {
-    showSection(hash);
+  if (hash && hash.match(/^[a-zA-Z][\w-]*$/)) { // Valid CSS identifier
+    const element = $('#' + hash);
+    if (element) {
+      showSection(hash);
+    }
   }
 };
 
@@ -1714,9 +1717,11 @@ window.addEventListener('DOMContentLoaded', () => {
       
       // Show corresponding content
       const tabId = btn.dataset.tab;
-      const tabContent = $(`#${tabId}`);
-      if (tabContent) {
-        tabContent.classList.add('active');
+      if (tabId && tabId.match(/^[a-zA-Z][\w-]*$/)) {
+        const tabContent = $(`#${tabId}`);
+        if (tabContent) {
+          tabContent.classList.add('active');
+        }
       }
     });
   });

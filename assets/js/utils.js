@@ -4,8 +4,28 @@
  */
 
 // DOM manipulation utilities
-export const $ = (selector) => document.querySelector(selector);
-export const $$ = (selector) => document.querySelectorAll(selector);
+export const $ = (selector) => {
+  try {
+    if (!selector || selector.trim() === '' || selector === '#') {
+      return null;
+    }
+    return document.querySelector(selector);
+  } catch (error) {
+    console.warn('Invalid CSS selector:', selector, error);
+    return null;
+  }
+};
+export const $$ = (selector) => {
+  try {
+    if (!selector || selector.trim() === '') {
+      return [];
+    }
+    return document.querySelectorAll(selector);
+  } catch (error) {
+    console.warn('Invalid CSS selector:', selector, error);
+    return [];
+  }
+};
 
 // Create element with attributes and content
 export const createElement = (tag, attributes = {}, content = '') => {
