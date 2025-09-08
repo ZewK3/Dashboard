@@ -1,12 +1,97 @@
 /**
  * Pet Marketplace Cloudflare Worker API
  * Full-stack backend with D1, R2, KV, JWT authentication, RBAC, and comprehensive endpoints
+ * Pure JavaScript version for direct Cloudflare Dashboard deployment
  */
 
-import { Router } from 'itty-router';
+// Simple router implementation (no external dependencies)
+class SimpleRouter {
+  constructor() {
+    this.routes = [];
+  }
+
+  addRoute(method, path, handler) {
+    this.routes.push({ method: method.toUpperCase(), path, handler });
+  }
+
+  get(path, handler) {
+    this.addRoute('GET', path, handler);
+  }
+
+  post(path, handler) {
+    this.addRoute('POST', path, handler);
+  }
+
+  put(path, handler) {
+    this.addRoute('PUT', path, handler);
+  }
+
+  delete(path, handler) {
+    this.addRoute('DELETE', path, handler);
+  }
+
+  options(path, handler) {
+    this.addRoute('OPTIONS', path, handler);
+  }
+
+  all(path, handler) {
+    this.addRoute('*', path, handler);
+  }
+
+  matchRoute(method, pathname) {
+    for (const route of this.routes) {
+      if (route.method !== '*' && route.method !== method) continue;
+      
+      const routeRegex = this.pathToRegex(route.path);
+      const match = pathname.match(routeRegex);
+      
+      if (match) {
+        const params = this.extractParams(route.path, pathname);
+        return { handler: route.handler, params };
+      }
+    }
+    return null;
+  }
+
+  pathToRegex(path) {
+    // Convert path like "/api/pets/:id" to regex
+    const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('^' + escapedPath.replace(/:\w+/g, '([^/]+)') + '$');
+  }
+
+  extractParams(routePath, actualPath) {
+    const params = {};
+    const routeParts = routePath.split('/');
+    const actualParts = actualPath.split('/');
+    
+    for (let i = 0; i < routeParts.length; i++) {
+      if (routeParts[i].startsWith(':')) {
+        const paramName = routeParts[i].slice(1);
+        params[paramName] = actualParts[i];
+      }
+    }
+    return params;
+  }
+
+  async handle(request, env, ctx) {
+    const url = new URL(request.url);
+    const match = this.matchRoute(request.method, url.pathname);
+    
+    if (match) {
+      // Add params to request object
+      request.params = match.params;
+      return await match.handler(request, env, ctx);
+    }
+    
+    return new Response(JSON.stringify({ error: 'Not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+}
 
 // Router instance
-const router = Router();
+const router = new SimpleRouter();
 
 // CORS headers for all responses
 const corsHeaders = {

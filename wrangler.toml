@@ -1,7 +1,7 @@
 name = "pet-market"
 main = "worker.js"
 compatibility_date = "2024-01-15"
-compatibility_flags = ["nodejs_compat"]
+# Pure JavaScript version - no nodejs_compat needed
 
 # Environment variables
 [vars]

@@ -2,11 +2,15 @@
 
 Hướng dẫn chi tiết để deploy ứng dụng PetMarket trực tiếp qua giao diện web Cloudflare Dashboard tại https://dash.cloudflare.com/
 
+> 💡 **Phương pháp mới**: Sử dụng pure JavaScript worker, deploy trực tiếp qua Dashboard mà không cần Wrangler CLI, build tools, hoặc dependencies.
+
 ## 📋 Yêu Cầu Trước Khi Bắt Đầu
 
 - ✅ Tài khoản Cloudflare (miễn phí hoặc trả phí)
 - ✅ Domain hoặc subdomain (tùy chọn)
-- ✅ Code repository từ GitHub/GitLab
+- ✅ File `worker.js` (pure JavaScript - không cần build tools)
+
+> 🚀 **Ưu điểm**: Worker được viết bằng pure JavaScript, không cần wrangler CLI, npm, hoặc build process. Copy-paste trực tiếp vào Dashboard!
 
 ## 🗂 BƯỚC 1: Tạo D1 Database
 
@@ -86,6 +90,8 @@ Tạo lần lượt 2 namespace:
 2. Xóa code mẫu, copy toàn bộ nội dung từ file `worker.js`
 3. Paste vào editor
 4. Click **"Save and deploy"**
+
+> ⚡ **Lưu ý**: File `worker.js` đã được tối ưu thành pure JavaScript, không cần build tools hay dependencies. Có thể copy-paste trực tiếp vào Cloudflare Dashboard!
 
 ### 4.4 Cấu hình Variables & Bindings
 
