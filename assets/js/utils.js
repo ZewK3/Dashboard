@@ -694,6 +694,87 @@ export const createPagination = (current, total, maxVisible = 5) => {
   return pages;
 };
 
+// Convenience exports for commonly used format functions
+export const formatCurrency = format.currency;
+export const formatDate = format.date;
+
+// Toast notification utility
+export const showToast = (message, type = 'info', duration = 3000) => {
+  const toast = createElement('div', {
+    className: `toast toast-${type}`,
+    innerHTML: `
+      <div class="toast-content">
+        <span class="toast-message">${message}</span>
+        <button class="toast-close" onclick="this.parentElement.parentElement.remove()">×</button>
+      </div>
+    `
+  });
+
+  // Add toast styles if not already present
+  if (!$('#toast-styles')) {
+    const styles = createElement('style', {
+      id: 'toast-styles',
+      innerHTML: `
+        .toast {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          padding: 12px 16px;
+          border-radius: 8px;
+          color: white;
+          font-weight: 500;
+          z-index: 10000;
+          min-width: 300px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          animation: slideInRight 0.3s ease-out;
+        }
+        .toast-info { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .toast-success { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .toast-warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .toast-error { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); }
+        .toast-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .toast-close {
+          background: none;
+          border: none;
+          color: white;
+          font-size: 18px;
+          cursor: pointer;
+          margin-left: 10px;
+        }
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @media (max-width: 480px) {
+          .toast {
+            right: 10px;
+            left: 10px;
+            min-width: auto;
+          }
+        }
+      `
+    });
+    document.head.appendChild(styles);
+  }
+
+  document.body.appendChild(toast);
+
+  // Auto remove after duration
+  if (duration > 0) {
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.remove();
+      }
+    }, duration);
+  }
+
+  return toast;
+};
+
 // Export all utilities as default object
 export default {
   $,
@@ -722,5 +803,8 @@ export default {
   isMobile,
   getViewport,
   scrollTo,
-  createPagination
+  createPagination,
+  formatCurrency,
+  formatDate,
+  showToast
 };
