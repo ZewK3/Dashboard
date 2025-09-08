@@ -170,7 +170,7 @@ const requireAuth = async (request, env) => {
 
   // Get user data
   const user = await env.PET_DB.prepare(`
-    SELECT id, fullName, email, phone, role, status, avatarUrl
+    SELECT id, fullName, email, phone, role, status, avatarUrl, canSell, balance
     FROM users WHERE id = ? AND status = 'active'
   `).bind(session.userId).first();
 
@@ -281,7 +281,7 @@ router.post('/api/dev/seed', async (request, env) => {
 // Authentication endpoints
 router.post('/api/auth/register', async (request, env) => {
   try {
-    const { fullName, email, phone, password, role = 'buyer' } = await request.json();
+    const { fullName, email, phone, password } = await request.json();
     
     // Validation
     if (!fullName || !email || !password) {
@@ -306,12 +306,15 @@ router.post('/api/auth/register', async (request, env) => {
     // Hash password
     const passwordHash = await hashPassword(password);
     const userId = generateId();
+    const role = 'user'; // Default unified user role
+    const canSell = 0; // Default: cannot sell initially
+    const balance = 1000; // Default balance: $10.00 (in cents)
 
     // Create user
     await env.PET_DB.prepare(`
-      INSERT INTO users (id, fullName, email, phone, passwordHash, role, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(userId, fullName, email, phone || null, passwordHash, role, 'active').run();
+      INSERT INTO users (id, fullName, email, phone, passwordHash, role, status, canSell, balance)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(userId, fullName, email, phone || null, passwordHash, role, 'active', canSell, balance).run();
 
     // Create session
     const sessionId = generateId();
@@ -325,7 +328,7 @@ router.post('/api/auth/register', async (request, env) => {
 
     // Get user data
     const user = await env.PET_DB.prepare(`
-      SELECT id, fullName, email, phone, role, status, avatarUrl, createdAt
+      SELECT id, fullName, email, phone, role, status, avatarUrl, canSell, balance, createdAt
       FROM users WHERE id = ?
     `).bind(userId).first();
 
@@ -365,7 +368,7 @@ router.post('/api/auth/login', async (request, env) => {
 
     // Find user
     const user = await env.PET_DB.prepare(`
-      SELECT id, fullName, email, phone, passwordHash, role, status, avatarUrl, createdAt
+      SELECT id, fullName, email, phone, passwordHash, role, status, avatarUrl, canSell, balance, createdAt
       FROM users WHERE email = ? AND status = 'active'
     `).bind(email).first();
 
@@ -466,6 +469,109 @@ router.get('/api/auth/me', async (request, env) => {
 
     const { user } = authResult;
     return new Response(JSON.stringify({ user }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// User management endpoints for unified system
+router.post('/api/users/enable-selling', async (request, env) => {
+  try {
+    const authResult = await requireAuth(request, env);
+    if (authResult.error) {
+      return new Response(JSON.stringify(authResult), {
+        status: authResult.status,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const { user } = authResult;
+
+    // Enable selling capability for the user
+    await env.PET_DB.prepare(`
+      UPDATE users SET canSell = 1 WHERE id = ?
+    `).bind(user.id).run();
+
+    // Log audit trail
+    await logAudit(env, user.id, 'user_enabled_selling', 'user', user.id, {}, 
+                   request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
+
+    // Get updated user data
+    const updatedUser = await env.PET_DB.prepare(`
+      SELECT id, fullName, email, phone, role, status, avatarUrl, canSell, balance
+      FROM users WHERE id = ?
+    `).bind(user.id).first();
+
+    return new Response(JSON.stringify({ 
+      user: updatedUser,
+      message: 'Selling capability enabled successfully'
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+router.post('/api/users/topup', async (request, env) => {
+  try {
+    const authResult = await requireAuth(request, env);
+    if (authResult.error) {
+      return new Response(JSON.stringify(authResult), {
+        status: authResult.status,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const { user } = authResult;
+    const { amount, paymentMethod = 'demo' } = await request.json();
+
+    // Validation
+    if (!amount || amount <= 0 || amount > 100000) { // Max $1000
+      return new Response(JSON.stringify({ error: 'Invalid amount' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Convert amount to cents
+    const amountCents = Math.round(amount * 100);
+
+    // Update user balance
+    await env.PET_DB.prepare(`
+      UPDATE users SET balance = balance + ? WHERE id = ?
+    `).bind(amountCents, user.id).run();
+
+    // Log audit trail
+    await logAudit(env, user.id, 'user_topup', 'user', user.id, 
+                   { amount: amountCents, paymentMethod }, 
+                   request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
+
+    // Track analytics
+    await trackAnalytics(env, user.id, user.id, 'balance_topup', 
+                        { amount: amountCents, paymentMethod }, 
+                        request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
+
+    // Get updated user data
+    const updatedUser = await env.PET_DB.prepare(`
+      SELECT id, fullName, email, phone, role, status, avatarUrl, canSell, balance
+      FROM users WHERE id = ?
+    `).bind(user.id).first();
+
+    return new Response(JSON.stringify({ 
+      user: updatedUser,
+      message: `Successfully topped up $${amount.toFixed(2)}`
+    }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });
 
@@ -696,7 +802,7 @@ router.post('/api/upload/presign', async (request, env) => {
 
 // Create new pet listing
 router.post('/api/pets', async (request, env) => {
-  const authResult = await requireRole(['seller', 'admin'])(request, env);
+  const authResult = await requireAuth(request, env);
   if (authResult.error) {
     return new Response(JSON.stringify(authResult), {
       status: authResult.status,
@@ -706,6 +812,18 @@ router.post('/api/pets', async (request, env) => {
 
   try {
     const { user } = authResult;
+    
+    // Check if user can sell pets
+    if (!user.canSell && user.role !== 'admin') {
+      return new Response(JSON.stringify({ 
+        error: 'You need to enable selling capability first',
+        requiresSellerRegistration: true
+      }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
     const petData = await request.json();
     
     // Validate required fields
@@ -719,6 +837,20 @@ router.post('/api/pets', async (request, env) => {
       }
     }
 
+    // Check and deduct posting fee ($0.50 = 50 cents)
+    const postingFee = 50; // 50 cents
+    if (user.balance < postingFee && user.role !== 'admin') {
+      return new Response(JSON.stringify({ 
+        error: 'Insufficient balance for posting fee ($0.50)',
+        currentBalance: user.balance / 100,
+        requiredBalance: postingFee / 100,
+        requiresTopUp: true
+      }), {
+        status: 402, // Payment Required
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
     const id = generateId();
     const slug = generateSlug(petData.title);
     const photos = JSON.stringify(petData.photos || []);
@@ -726,6 +858,7 @@ router.post('/api/pets', async (request, env) => {
       ? petData.personalityTraits.join(',') 
       : petData.personalityTraits || '';
 
+    // Start transaction-like operations
     await env.PET_DB.prepare(`
       INSERT INTO pets (
         id, sellerId, title, slug, species, breed, sex, ageMonths, 
@@ -740,13 +873,31 @@ router.post('/api/pets', async (request, env) => {
       petData.height || null, petData.color || '', personalityTraits
     ).run();
 
+    // Deduct posting fee (skip for admin)
+    if (user.role !== 'admin') {
+      await env.PET_DB.prepare(`
+        UPDATE users SET balance = balance - ? WHERE id = ?
+      `).bind(postingFee, user.id).run();
+
+      // Log posting fee deduction
+      await logAudit(env, user.id, 'posting_fee_deducted', 'user', user.id, 
+                     { amount: postingFee, petId: id }, 
+                     request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
+    }
+
     // Log audit
     await logAudit(env, user.id, 'CREATE', 'pet', id, petData);
+
+    // Track analytics
+    await trackAnalytics(env, user.id, user.id, 'pet_listing_created', 
+                        { species: petData.species, price: petData.price }, 
+                        request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
 
     return new Response(JSON.stringify({ 
       success: true, 
       id, 
       slug,
+      postingFeeDeducted: user.role !== 'admin' ? postingFee / 100 : 0,
       message: 'Pet listing created successfully and pending approval' 
     }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders }

@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     phone TEXT,
     passwordHash TEXT NOT NULL,
-    role TEXT CHECK(role IN ('buyer','seller','admin','support')) NOT NULL DEFAULT 'buyer',
+    role TEXT CHECK(role IN ('user','admin','support')) NOT NULL DEFAULT 'user',
+    canSell INTEGER DEFAULT 0, -- 0: cannot sell, 1: can sell pets
+    balance INTEGER DEFAULT 0, -- user balance in cents/dong
     status TEXT CHECK(status IN ('active','banned','pending')) DEFAULT 'active',
     avatarUrl TEXT,
     createdAt TEXT DEFAULT (datetime('now')),
@@ -113,12 +115,12 @@ CREATE INDEX IF NOT EXISTS idx_favorites_pet ON favorites(petId);
 -- Shopping Carts
 CREATE TABLE IF NOT EXISTS carts (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-    buyerId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     createdAt TEXT DEFAULT (datetime('now')),
     updatedAt TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_carts_buyer ON carts(buyerId);
+CREATE INDEX IF NOT EXISTS idx_carts_user ON carts(userId);
 
 -- Cart Items
 CREATE TABLE IF NOT EXISTS cart_items (
@@ -162,8 +164,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(createdAt);
 -- Chat Threads
 CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-    buyerId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    sellerId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    userId1 TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    userId2 TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     petId TEXT REFERENCES pets(id) ON DELETE SET NULL,
     orderId TEXT REFERENCES orders(id) ON DELETE SET NULL,
     lastMessageAt TEXT DEFAULT (datetime('now')),
@@ -171,8 +173,8 @@ CREATE TABLE IF NOT EXISTS threads (
     createdAt TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_threads_buyer ON threads(buyerId);
-CREATE INDEX IF NOT EXISTS idx_threads_seller ON threads(sellerId);
+CREATE INDEX IF NOT EXISTS idx_threads_user1 ON threads(userId1);
+CREATE INDEX IF NOT EXISTS idx_threads_user2 ON threads(userId2);
 CREATE INDEX IF NOT EXISTS idx_threads_pet ON threads(petId);
 CREATE INDEX IF NOT EXISTS idx_threads_order ON threads(orderId);
 CREATE INDEX IF NOT EXISTS idx_threads_last_message ON threads(lastMessageAt);

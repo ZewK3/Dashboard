@@ -1226,10 +1226,13 @@
     </div>
 
     <div id="auth-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="auth-modal-title">Đăng nhập</h2>
-                <button class="modal-close" id="auth-modal-close">
+        <div class="modal-content cute-modal">
+            <div class="modal-header cute-header">
+                <h2 id="auth-modal-title" class="cute-title">
+                    <i class="fas fa-paw cute-icon"></i>
+                    Đăng nhập
+                </h2>
+                <button class="modal-close cute-close" id="auth-modal-close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -1237,48 +1240,67 @@
                 <!-- Login Form -->
                 <form id="login-form" class="auth-form">
                     <div class="form-group">
-                        <label for="login-email">Email</label>
+                        <label for="login-email">
+                            <i class="fas fa-envelope cute-icon"></i>
+                            Email
+                        </label>
                         <input type="email" id="login-email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="login-password">Mật khẩu</label>
+                        <label for="login-password">
+                            <i class="fas fa-lock cute-icon"></i>
+                            Mật khẩu
+                        </label>
                         <input type="password" id="login-password" name="password" required>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-full">Đăng nhập</button>
+                    <button type="submit" class="btn btn-primary btn-full cute-btn">
+                        <i class="fas fa-paw"></i>
+                        Đăng nhập
+                    </button>
                 </form>
                 
                 <!-- Register Form -->
                 <form id="register-form" class="auth-form" style="display: none;">
                     <div class="form-group">
-                        <label for="register-name">Họ và tên</label>
+                        <label for="register-name">
+                            <i class="fas fa-user cute-icon"></i>
+                            Họ và tên
+                        </label>
                         <input type="text" id="register-name" name="fullName" required>
                     </div>
                     <div class="form-group">
-                        <label for="register-email">Email</label>
+                        <label for="register-email">
+                            <i class="fas fa-envelope cute-icon"></i>
+                            Email
+                        </label>
                         <input type="email" id="register-email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="register-phone">Số điện thoại</label>
+                        <label for="register-phone">
+                            <i class="fas fa-phone cute-icon"></i>
+                            Số điện thoại
+                        </label>
                         <input type="tel" id="register-phone" name="phone">
                     </div>
                     <div class="form-group">
-                        <label for="register-password">Mật khẩu</label>
+                        <label for="register-password">
+                            <i class="fas fa-lock cute-icon"></i>
+                            Mật khẩu
+                        </label>
                         <input type="password" id="register-password" name="password" required>
                     </div>
-                    <div class="form-group">
-                        <label for="register-role">Vai trò</label>
-                        <select id="register-role" name="role">
-                            <option value="buyer">Người mua</option>
-                            <option value="seller">Người bán</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-full">Đăng ký</button>
+                    <button type="submit" class="btn btn-primary btn-full cute-btn">
+                        <i class="fas fa-heart"></i>
+                        Đăng ký ngay
+                    </button>
                 </form>
                 
-                <div class="auth-switch">
+                <div class="auth-switch cute-switch">
                     <p id="auth-switch-text">
+                        <i class="fas fa-heart cute-icon"></i>
                         Chưa có tài khoản? 
-                        <button type="button" id="auth-switch-btn" class="link-btn">Đăng ký ngay</button>
+                        <button type="button" id="auth-switch-btn" class="link-btn cute-link">Đăng ký ngay</button>
+                        <i class="fas fa-sparkles cute-icon"></i>
                     </p>
                 </div>
             </div>

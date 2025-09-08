@@ -19,10 +19,11 @@ const DEMO_DATA = {
   users: [
     {
       id: 1,
-      email: 'buyer@demo.com',
-      fullName: 'Nguyễn Văn A',
-      role: 'buyer',
-      canSell: false,
+      email: 'user1@demo.com',
+      fullName: 'Nguyễn Văn Hùng',
+      role: 'user',
+      canSell: 0,
+      balance: 10000, // $100.00 in cents
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
       phone: '0123456789',
       address: '123 Nguyễn Huệ, Quận 1, TP.HCM',
@@ -30,10 +31,11 @@ const DEMO_DATA = {
     },
     {
       id: 2,
-      email: 'seller@demo.com', 
-      fullName: 'Trần Thị B',
-      role: 'seller',
-      canSell: true,
+      email: 'user2@demo.com', 
+      fullName: 'Trần Thị Linh',
+      role: 'user',
+      canSell: 1,
+      balance: 5000, // $50.00 in cents
       avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
       phone: '0987654321',
       address: '456 Lê Lợi, Quận Hai Bà Trưng, Hà Nội',
@@ -43,9 +45,10 @@ const DEMO_DATA = {
     {
       id: 3,
       email: 'admin@demo.com',
-      fullName: 'Admin PetMarket',
+      fullName: 'Lê Văn Quản',
       role: 'admin',
-      canSell: true,
+      canSell: 1,
+      balance: 15000, // $150.00 in cents
       avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
       phone: '0111222333',
       address: 'Văn phòng PetMarket',
@@ -54,9 +57,10 @@ const DEMO_DATA = {
     {
       id: 4,
       email: 'support@demo.com',
-      fullName: 'Nguyễn Thị Hỗ Trợ',
+      fullName: 'Phạm Thị Hỗ Trợ',
       role: 'support',
-      canSell: false,
+      canSell: 0,
+      balance: 2500, // $25.00 in cents
       avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
       phone: '0999888777',
       address: 'Phòng CSKH PetMarket',
@@ -64,10 +68,11 @@ const DEMO_DATA = {
     },
     {
       id: 5,
-      email: 'seller2@demo.com',
-      fullName: 'Lê Văn C',
-      role: 'seller',
-      canSell: true,
+      email: 'user3@demo.com',
+      fullName: 'Hoàng Minh Tuấn',
+      role: 'user',
+      canSell: 1,
+      balance: 8000, // $80.00 in cents
       avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
       phone: '0345678901',
       address: '789 Võ Văn Tần, Quận 3, TP.HCM',
@@ -76,10 +81,11 @@ const DEMO_DATA = {
     },
     {
       id: 6,
-      email: 'buyer2@demo.com',
-      fullName: 'Phạm Thị D',
-      role: 'buyer',
-      canSell: false,
+      email: 'user4@demo.com',
+      fullName: 'Vũ Thị Lan',
+      role: 'user',
+      canSell: 0,
+      balance: 12000, // $120.00 in cents
       avatar: 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=150&h=150&fit=crop&crop=face',
       phone: '0567890123',
       address: '321 Cách Mạng Tháng 8, Quận 10, TP.HCM',
@@ -237,8 +243,9 @@ const mockAPI = {
       const newUser = {
         id: DEMO_DATA.users.length + 1,
         ...userData,
-        role: 'buyer',
-        canSell: false,
+        role: 'user',
+        canSell: 0,
+        balance: 1000, // $10.00 starting balance
         avatar: null,
         createdAt: new Date().toISOString()
       };
@@ -620,6 +627,39 @@ export const authAPI = {
     }
     
     return api.put('/api/auth/password', passwordData);
+  },
+
+  // Enable selling capability
+  enableSelling: async () => {
+    if (CONFIG.USE_DEMO_MODE) {
+      await mockDelay();
+      if (DEMO_DATA.currentUser) {
+        DEMO_DATA.currentUser.canSell = 1;
+        return { success: true, user: DEMO_DATA.currentUser, message: 'Đã kích hoạt quyền bán hàng!' };
+      }
+      return { error: 'Not logged in' };
+    }
+    
+    return api.post('/api/users/enable-selling');
+  },
+
+  // Top up user balance
+  topUp: async (amount, paymentMethod = 'demo') => {
+    if (CONFIG.USE_DEMO_MODE) {
+      await mockDelay();
+      if (DEMO_DATA.currentUser) {
+        const amountCents = Math.round(amount * 100);
+        DEMO_DATA.currentUser.balance += amountCents;
+        return { 
+          success: true, 
+          user: DEMO_DATA.currentUser, 
+          message: `Đã nạp thành công $${amount.toFixed(2)}!` 
+        };
+      }
+      return { error: 'Not logged in' };
+    }
+    
+    return api.post('/api/users/topup', { amount, paymentMethod });
   }
 };
 
