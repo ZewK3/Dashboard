@@ -215,6 +215,12 @@ const initUI = () => {
   // Setup user dropdown
   initUserDropdown();
   
+  // Setup cart functionality
+  initCartFunctionality();
+  
+  // Setup notifications
+  initNotificationSystem();
+  
   // Setup lazy loading for images
   utils.lazyLoadImages();
   
@@ -278,6 +284,204 @@ const initUserDropdown = () => {
       }
     });
   }
+};
+
+// Initialize cart functionality
+const initCartFunctionality = () => {
+  const cartIcon = $('#cart-icon');
+  const cartBadge = $('#cart-badge');
+  
+  if (cartIcon) {
+    on(cartIcon, 'click', () => {
+      showCartModal();
+    });
+  }
+  
+  // Update cart count from localStorage
+  updateCartBadge();
+  
+  // Listen for cart updates
+  window.addEventListener('cart:updated', updateCartBadge);
+};
+
+// Initialize notification system
+const initNotificationSystem = () => {
+  const notificationIcon = $('#notification-icon');
+  const notificationBadge = $('#notification-badge');
+  
+  if (notificationIcon) {
+    on(notificationIcon, 'click', () => {
+      showNotificationsModal();
+    });
+  }
+  
+  // Update notification count
+  updateNotificationBadge();
+  
+  // Check for new notifications periodically
+  if (currentUser) {
+    setInterval(checkNewNotifications, 30000); // Check every 30 seconds
+  }
+};
+
+// Update cart badge
+const updateCartBadge = () => {
+  const cartBadge = $('#cart-badge');
+  if (cartBadge) {
+    const cart = storage.get('cart') || [];
+    const itemCount = cart.reduce((total, item) => total + (item.quantity || 1), 0);
+    cartBadge.textContent = itemCount;
+    cartBadge.style.display = itemCount > 0 ? 'flex' : 'none';
+  }
+};
+
+// Update notification badge
+const updateNotificationBadge = () => {
+  const notificationBadge = $('#notification-badge');
+  if (notificationBadge) {
+    const unreadCount = storage.get('unreadNotifications') || 0;
+    notificationBadge.textContent = unreadCount;
+    notificationBadge.style.display = unreadCount > 0 ? 'flex' : 'none';
+  }
+};
+
+// Show cart modal
+const showCartModal = () => {
+  const cart = storage.get('cart') || [];
+  const cartHTML = `
+    <div class="modal-header">
+      <h3><i class="fas fa-shopping-cart"></i> Giỏ hàng của bạn</h3>
+      <button onclick="closeModal('cart-modal')" class="modal-close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      ${cart.length === 0 ? 
+        '<div class="empty-cart" style="text-align: center; padding: 2rem;"><i class="fas fa-shopping-cart" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i><p>Giỏ hàng trống</p></div>' :
+        cart.map(item => `
+          <div class="cart-item" data-pet-id="${item.id}" style="display: flex; gap: 1rem; padding: 1rem; border-bottom: 1px solid #eee;">
+            <img src="${item.image}" alt="${item.name}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
+            <div class="cart-item-details" style="flex: 1;">
+              <h4 style="margin: 0 0 0.5rem 0;">${item.name}</h4>
+              <p class="cart-item-price" style="color: var(--pink-accent); font-weight: bold; margin: 0 0 0.5rem 0;">$${item.price}</p>
+              <div class="cart-item-actions" style="display: flex; gap: 0.5rem;">
+                <button onclick="removeFromCart('${item.id}')" class="btn btn-sm btn-outline">
+                  <i class="fas fa-trash"></i> Xóa
+                </button>
+                <button onclick="contactSeller('${item.sellerId}')" class="btn btn-sm btn-primary">
+                  <i class="fas fa-comments"></i> Liên hệ
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('')
+      }
+    </div>
+    ${cart.length > 0 ? `
+      <div class="modal-footer">
+        <button onclick="checkoutCart()" class="btn btn-primary btn-large">
+          <i class="fas fa-credit-card"></i> Thanh toán
+        </button>
+      </div>
+    ` : ''}
+  `;
+  
+  showModal('cart-modal', cartHTML);
+};
+
+// Show notifications modal
+const showNotificationsModal = () => {
+  const notifications = storage.get('notifications') || [];
+  const notificationHTML = `
+    <div class="modal-header">
+      <h3><i class="fas fa-bell"></i> Thông báo</h3>
+      <button onclick="closeModal('notifications-modal')" class="modal-close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      ${notifications.length === 0 ? 
+        '<div class="empty-notifications" style="text-align: center; padding: 2rem;"><i class="fas fa-bell-slash" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i><p>Không có thông báo mới</p></div>' :
+        notifications.map(notification => `
+          <div class="notification-item ${notification.read ? '' : 'unread'}" style="display: flex; gap: 1rem; padding: 1rem; border-bottom: 1px solid #eee; ${!notification.read ? 'background: #fff8f0;' : ''}">
+            <div class="notification-icon" style="width: 40px; height: 40px; background: var(--pink-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--pink-accent);">
+              <i class="fas ${getNotificationIcon(notification.type)}"></i>
+            </div>
+            <div class="notification-content" style="flex: 1;">
+              <h4 style="margin: 0 0 0.25rem 0; font-size: 0.9rem;">${notification.title}</h4>
+              <p style="margin: 0 0 0.5rem 0; color: #666; font-size: 0.8rem;">${notification.message}</p>
+              <span class="notification-time" style="font-size: 0.7rem; color: #999;">${formatTime(notification.timestamp)}</span>
+            </div>
+          </div>
+        `).join('')
+      }
+    </div>
+    <div class="modal-footer">
+      <button onclick="markAllNotificationsRead()" class="btn btn-outline">
+        <i class="fas fa-check-double"></i> Đánh dấu đã đọc
+      </button>
+    </div>
+  `;
+  
+  showModal('notifications-modal', notificationHTML);
+};
+
+// Helper functions for notifications
+const getNotificationIcon = (type) => {
+  const icons = {
+    favorite: 'fa-heart',
+    message: 'fa-comment',
+    order: 'fa-shopping-bag',
+    admin: 'fa-cog',
+    default: 'fa-bell'
+  };
+  return icons[type] || icons.default;
+};
+
+const formatTime = (timestamp) => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffMins < 1) return 'Vừa xong';
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+  return date.toLocaleDateString('vi-VN');
+};
+
+// Global functions for cart and notifications
+window.removeFromCart = (petId) => {
+  const cart = storage.get('cart') || [];
+  const updatedCart = cart.filter(item => item.id !== petId);
+  storage.set('cart', updatedCart);
+  window.dispatchEvent(new CustomEvent('cart:updated'));
+  showCartModal(); // Refresh modal
+  showToast('Đã xóa khỏi giỏ hàng', 'success');
+};
+
+window.contactSeller = (sellerId) => {
+  closeModal('cart-modal');
+  // Navigate to chat or contact form
+  showToast('Mở cửa sổ chat...', 'info');
+};
+
+window.checkoutCart = () => {
+  closeModal('cart-modal');
+  showToast('Chức năng thanh toán đang được phát triển', 'info');
+};
+
+window.markAllNotificationsRead = () => {
+  const notifications = storage.get('notifications') || [];
+  const updatedNotifications = notifications.map(n => ({ ...n, read: true }));
+  storage.set('notifications', updatedNotifications);
+  storage.set('unreadNotifications', 0);
+  updateNotificationBadge();
+  showNotificationsModal(); // Refresh modal
+  showToast('Đã đánh dấu tất cả thông báo', 'success');
 };
 
 // Initialize search functionality

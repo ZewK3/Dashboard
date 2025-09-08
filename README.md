@@ -1,55 +1,41 @@
-# PetMarket Vietnam - Complete Pet Trading Platform
+# 🐾 PetMarket Vietnam - Chợ Thú Cưng Trực Tuyến
 
-A modern, production-ready pet marketplace with **Cloudflare Workers**, **D1 Database**, **R2 Storage**, cute paw print animations, and unified user experience. Built for Vietnamese pet lovers with comprehensive backend API and delightful frontend.
+**Nền tảng mua bán thú cưng hiện đại, chuyên nghiệp và đáng tin cậy cho cộng đồng Việt Nam**
+
+Được xây dựng với **Cloudflare Workers**, **D1 Database**, **R2 Storage** và các hiệu ứng dễ thương, mang đến trải nghiệm mua sắm thú cưng tuyệt vời cho người Việt.
 
 ![PetMarket Vietnam](https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=1200&h=400&fit=crop)
 
-## ✨ Latest Updates
+[![Deploy Status](https://img.shields.io/badge/Deploy-Ready-success?style=flat-square&logo=cloudflare)](https://dash.cloudflare.com/)
+[![Vietnamese](https://img.shields.io/badge/Language-Vietnamese-blue?style=flat-square&logo=vietnam)](README.md)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-### 🎨 Enhanced UI/UX
-- **Cute Paw Print Animations**: Floating dog and cat paw prints with interactive effects
-- **Single Pink Theme**: Consistent, adorable pink color scheme optimized for Vietnamese users
-- **Mobile-First Responsive**: Perfect experience across all devices
+## 🎯 Tính Năng Nổi Bật
 
-### 🚀 Complete Backend API
-- **40+ REST Endpoints**: Full CRUD operations for pets, orders, favorites, chat, admin
-- **Production-Ready**: JWT auth, audit logging, comprehensive error handling
-- **Cloudflare Integration**: D1, R2, KV with rate limiting and security
+### 🛒 **Marketplace Chuyên Nghiệp**
+- **Tìm kiếm thông minh**: Lọc theo loại, giống, giá cả, vị trí
+- **Hệ thống đánh giá**: Đánh giá người bán và thú cưng
+- **Chat trực tiếp**: Nhắn tin giữa người mua và người bán
+- **Giỏ hàng & Yêu thích**: Lưu và quản lý thú cưng quan tâm
+- **Thanh toán an toàn**: Tích hợp ví điện tử và phí đăng tin
 
-### 💰 Unified User System
-- **Seamless Seller Registration**: Any user can become a seller instantly
-- **Balance Management**: Built-in wallet with $0.5 posting fees
-- **Smart Payment Integration**: Multiple payment methods with validation
+### 🎨 **Giao Diện Dễ Thương**
+- **Hiệu ứng paw prints**: Dấu chân thú cưng floating cute
+- **Theme màu hồng**: Gam màu pastel nhẹ nhàng, phù hợp với thú cưng
+- **Mobile-first**: Tối ưu hoàn hảo cho điện thoại
+- **Responsive design**: Hoạt động mượt mà trên mọi thiết bị
 
-## 🎯 Features
+### 👥 **Hệ Thống Người Dùng Thống Nhất**
+- **Đăng ký dễ dàng**: Một tài khoản cho cả mua và bán
+- **Quản lý số dư**: Ví tích hợp với phí đăng tin $0.5
+- **Phân quyền thông minh**: User, Seller, Admin, Support
+- **Bảo mật cao**: JWT authentication với HttpOnly cookies
 
-### Customer Experience
-- **Adorable Design**: Cute paw print animations and pink gradient theme
-- **Advanced Pet Search**: Species, breed, price, location filtering
-- **Real-time Chat**: Secure messaging with support staff
-- **Favorites & Cart**: Save pets and manage purchases  
-- **User Balance System**: Top-up wallet for posting fees
-- **Mobile Optimized**: Touch-friendly interface
-
-### Seller Dashboard
-- **Easy Pet Listing**: Step-by-step creation with image upload
-- **$0.5 Posting Fee**: Automatic deduction from user balance
-- **Order Management**: Track sales and buyer communication
-- **Performance Analytics**: Listing views and engagement stats
-
-### Admin Panel
-- **Content Moderation**: Approve/reject pet listings
-- **User Management**: Account control and permissions
-- **Platform Statistics**: Users, pets, orders dashboard
-- **Support Tools**: Ticket and report management
-
-### Complete Backend
-- **Pet CRUD Operations**: Create, read, update, delete listings
-- **Order Management**: Cart, checkout, payment processing
-- **Chat System**: Real-time messaging between users
-- **Favorites**: Add/remove pets from favorites
-- **File Upload**: R2 presigned URLs for pet images
-- **Admin Functions**: Moderation, statistics, user management
+### 🛠 **Dashboard Quản Lý**
+- **Seller Dashboard**: Quản lý tin đăng và đơn hàng
+- **Admin Panel**: Duyệt bài, quản lý người dùng, thống kê
+- **Support Center**: Hệ thống ticket và chat hỗ trợ
+- **Analytics**: Báo cáo chi tiết về hiệu suất bán hàng
 
 ## 🛠 Technology Stack
 
@@ -73,88 +59,37 @@ A modern, production-ready pet marketplace with **Cloudflare Workers**, **D1 Dat
 - **Rate Limiting**: API protection
 - **Audit Logging**: Activity tracking
 
-## 🚀 Quick Start
+## 🚀 Hướng Dẫn Deploy Nhanh
 
-### Prerequisites
-- Node.js 18+ and npm
-- Cloudflare account
-- Wrangler CLI installed (`npm install -g wrangler`)
+### 📋 **Yêu Cầu Hệ Thống**
+- Tài khoản Cloudflare (miễn phí)
+- Domain hoặc subdomain (tùy chọn)
+- Git repository
 
-### 1. Clone Repository
+### ⚡ **Deploy 1-Click**
 ```bash
+# Clone project
 git clone https://github.com/ZewK3/Dashboard.git
 cd Dashboard
-```
 
-### 2. Install Dependencies
-```bash
+# Deploy with Wrangler CLI
 npm install -g wrangler
 wrangler login
-```
-
-### 3. Create Cloudflare Resources
-
-#### Create D1 Database
-```bash
-wrangler d1 create pet_market_db
-```
-Copy the database ID and update `wrangler.toml`:
-```toml
-[[d1_databases]]
-binding = "PET_DB"
-database_name = "pet_market_db"
-database_id = "your-d1-database-id-here"
-```
-
-#### Create R2 Bucket
-```bash
-wrangler r2 bucket create pet-images
-```
-
-#### Create KV Namespaces
-```bash
-wrangler kv:namespace create "SESSIONS_KV"
-wrangler kv:namespace create "RATELIMIT_KV"
-```
-Update the IDs in `wrangler.toml`.
-
-### 4. Configure Environment
-Update `wrangler.toml` with your values:
-```toml
-[vars]
-JWT_SECRET = "your-super-secret-jwt-key-min-32-chars"
-ALLOWED_ORIGIN = "http://localhost:8080"
-DEV = "true"
-R2_PUBLIC_BASE = "https://your-r2-domain.com"
-```
-
-### 5. Run Database Migrations
-```bash
-# Use the new migration system
-wrangler d1 execute PET_DB --file=migrations/0001_initial_schema.sql
-
-# Or use the legacy files (same content)
-wrangler d1 execute PET_DB --file=schema.sql
-```
-
-### 6. Seed Development Data
-```bash
-wrangler d1 execute PET_DB --file=seeds.sql
-```
-
-### 7. Deploy Worker
-```bash
 wrangler deploy
 ```
 
-### 8. Serve Frontend
-```bash
-# Simple HTTP server
-npx http-server . -p 8080
+### 🌐 **Deploy qua Cloudflare Dashboard**
+Xem hướng dẫn chi tiết tại: **[CLOUDFLARE_DEPLOY.md](CLOUDFLARE_DEPLOY.md)**
 
-# Or use any static server
-python -m http.server 8080
-```
+- ✅ Step-by-step qua giao diện web
+- ✅ Không cần CLI commands
+- ✅ Phù hợp với người mới bắt đầu
+
+### 🔧 **Cấu Hình Nhanh**
+1. **D1 Database**: `pet_market_db`
+2. **R2 Storage**: `pet-images` 
+3. **KV Namespaces**: `SESSIONS_KV`, `RATELIMIT_KV`
+4. **Environment Variables**: JWT_SECRET, ALLOWED_ORIGIN
 
 ## 📁 Project Structure
 
@@ -222,22 +157,20 @@ Dashboard/
 - `GET /api/health` - Health check endpoint
 - `POST /api/dev/seed` - Seed development data (dev only)
 
-## 👤 Demo Accounts & Features
+## 👤 **Tài Khoản Demo & Test**
 
-### Default Login Credentials
-| Email | Password | Role | Features |
-|-------|----------|------|----------|
-| `buyer@demo.com` | `demo123` | Buyer | Browse pets, favorites, cart, chat |
-| `seller@demo.com` | `demo123` | Seller | Create listings, manage sales, $10 balance |
-| `admin@demo.com` | `demo123` | Admin | Approve listings, user management, statistics |
-| `support@demo.com` | `demo123` | Support | Handle tickets, live chat assistance |
+| Email | Mật khẩu | Vai trò | Chức năng |
+|-------|----------|---------|-----------|
+| `user@demo.com` | `demo123` | Người dùng | Duyệt thú cưng, yêu thích, giỏ hàng |
+| `seller@demo.com` | `demo123` | Người bán | Đăng tin, quản lý bán hàng, số dư $10 |
+| `admin@demo.com` | `demo123` | Quản trị | Duyệt bài, quản lý người dùng, thống kê |
+| `support@demo.com` | `demo123` | Hỗ trợ | Xử lý ticket, chat hỗ trợ trực tiếp |
 
-### Demo Features
-- **8 Pet Listings**: Dogs, cats, birds, fish, rabbits with real Unsplash images
-- **Balance System**: Sellers start with demo balance for posting fees
-- **Cute Animations**: Floating paw prints and heart effects
-- **Mobile Responsive**: Optimized for touch interfaces
-- **Vietnamese Interface**: Complete localization
+### 🐾 **Dữ Liệu Demo**
+- **8 Thú cưng mẫu**: Chó, mèo, chim, cá, thỏ với hình ảnh thật từ Unsplash
+- **Hệ thống số dư**: Seller có sẵn số dư demo để test đăng tin
+- **Chat & Support**: Test messaging giữa users và support staff
+- **Mobile responsive**: Test đầy đủ trên điện thoại
 
 ## 🔧 Development
 
