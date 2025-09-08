@@ -3410,3 +3410,212 @@ a:hover {
     font-size: 1rem;
   }
 }
+
+/* ===== CUTE PAW PRINT ANIMATIONS ===== */
+
+/* Paw prints container */
+.paw-prints {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+/* Individual paw print styles */
+.paw-print {
+  position: absolute;
+  opacity: 0;
+  font-size: 1.5rem;
+  color: var(--pink-light);
+  animation: float 8s infinite ease-in-out;
+  user-select: none;
+  transform: rotate(0deg);
+}
+
+/* Dog paw prints */
+.paw-print.dog {
+  color: var(--pink-warm);
+  filter: drop-shadow(0 2px 4px rgba(255, 105, 180, 0.2));
+}
+
+/* Cat paw prints */
+.paw-print.cat {
+  color: var(--pink-pastel);
+  filter: drop-shadow(0 2px 4px rgba(255, 192, 203, 0.2));
+}
+
+/* Floating animation */
+@keyframes float {
+  0% {
+    opacity: 0;
+    transform: translateY(100vh) translateX(0) rotate(0deg) scale(0.8);
+  }
+  10% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(50vh) translateX(20px) rotate(180deg) scale(1);
+  }
+  90% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10vh) translateX(-20px) rotate(360deg) scale(0.6);
+  }
+}
+
+/* Different animation delays and durations for variety */
+.paw-print:nth-child(1) { 
+  animation-delay: 0s; 
+  animation-duration: 8s;
+  left: 10%;
+}
+.paw-print:nth-child(2) { 
+  animation-delay: 1s; 
+  animation-duration: 9s;
+  left: 20%;
+}
+.paw-print:nth-child(3) { 
+  animation-delay: 2s; 
+  animation-duration: 7s;
+  left: 30%;
+}
+.paw-print:nth-child(4) { 
+  animation-delay: 3s; 
+  animation-duration: 10s;
+  left: 40%;
+}
+.paw-print:nth-child(5) { 
+  animation-delay: 4s; 
+  animation-duration: 8s;
+  left: 50%;
+}
+.paw-print:nth-child(6) { 
+  animation-delay: 5s; 
+  animation-duration: 9s;
+  left: 60%;
+}
+.paw-print:nth-child(7) { 
+  animation-delay: 6s; 
+  animation-duration: 7s;
+  left: 70%;
+}
+.paw-print:nth-child(8) { 
+  animation-delay: 7s; 
+  animation-duration: 8s;
+  left: 80%;
+}
+.paw-print:nth-child(9) { 
+  animation-delay: 1.5s; 
+  animation-duration: 9s;
+  left: 90%;
+}
+.paw-print:nth-child(10) { 
+  animation-delay: 2.5s; 
+  animation-duration: 10s;
+  left: 15%;
+}
+
+/* Smaller paw prints for mobile */
+@media (max-width: 768px) {
+  .paw-print {
+    font-size: 1rem;
+    animation-duration: 6s;
+  }
+  
+  /* Reduce number of paw prints on mobile for performance */
+  .paw-print:nth-child(n+6) {
+    display: none;
+  }
+}
+
+/* Pulse animation for extra cuteness */
+@keyframes pawPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+/* Add pulse to random paw prints */
+.paw-print:nth-child(3n) {
+  animation: float 8s infinite ease-in-out, pawPulse 2s infinite ease-in-out;
+}
+
+/* Heart trail effect for special moments */
+.paw-trail {
+  position: absolute;
+  opacity: 0;
+  font-size: 0.8rem;
+  color: var(--pink-accent);
+  animation: trail 3s infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes trail {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.3) translateY(-30px);
+  }
+}
+
+/* Hover effect on pet cards to show trail */
+.pet-card:hover .paw-trail {
+  animation: trail 1s ease-out;
+}
+
+/* Extra cute floating hearts on favorite actions */
+.favorite-hearts {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.favorite-heart {
+  position: absolute;
+  opacity: 0;
+  font-size: 1.2rem;
+  color: var(--pink-accent);
+  animation: heartFloat 2s ease-out forwards;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes heartFloat {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -70px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -100px) scale(0.8);
+  }
+}
+
+/* Random positioning for favorite hearts */
+.favorite-heart:nth-child(1) { animation-delay: 0s; left: 40%; }
+.favorite-heart:nth-child(2) { animation-delay: 0.2s; left: 50%; }
+.favorite-heart:nth-child(3) { animation-delay: 0.4s; left: 60%; }
+.favorite-heart:nth-child(4) { animation-delay: 0.6s; left: 45%; }
+.favorite-heart:nth-child(5) { animation-delay: 0.8s; left: 55%; }

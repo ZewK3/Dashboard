@@ -692,6 +692,843 @@ router.post('/api/upload/presign', async (request, env) => {
   }
 });
 
+// ===== PET MANAGEMENT ENDPOINTS =====
+
+// Create new pet listing
+router.post('/api/pets', async (request, env) => {
+  const authResult = await requireRole(['seller', 'admin'])(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const petData = await request.json();
+    
+    // Validate required fields
+    const required = ['title', 'species', 'breed', 'sex', 'ageMonths', 'price', 'description', 'locationProvince'];
+    for (const field of required) {
+      if (!petData[field]) {
+        return new Response(JSON.stringify({ error: `${field} is required` }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+    }
+
+    const id = generateId();
+    const slug = generateSlug(petData.title);
+    const photos = JSON.stringify(petData.photos || []);
+    const personalityTraits = Array.isArray(petData.personalityTraits) 
+      ? petData.personalityTraits.join(',') 
+      : petData.personalityTraits || '';
+
+    await env.PET_DB.prepare(`
+      INSERT INTO pets (
+        id, sellerId, title, slug, species, breed, sex, ageMonths, 
+        vaccinated, dewormed, price, description, locationProvince, 
+        photos, status, weight, height, color, personalityTraits
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+    `).bind(
+      id, user.id, petData.title, slug, petData.species, petData.breed,
+      petData.sex, petData.ageMonths, petData.vaccinated ? 1 : 0,
+      petData.dewormed ? 1 : 0, petData.price, petData.description,
+      petData.locationProvince, photos, petData.weight || null,
+      petData.height || null, petData.color || '', personalityTraits
+    ).run();
+
+    // Log audit
+    await logAudit(env, user.id, 'CREATE', 'pet', id, petData);
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      id, 
+      slug,
+      message: 'Pet listing created successfully and pending approval' 
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Create pet error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to create pet listing' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Update pet listing
+router.put('/api/pets/:id', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const petId = request.params.id;
+    const petData = await request.json();
+
+    // Check if pet exists and user owns it (or is admin)
+    const pet = await env.PET_DB.prepare(`
+      SELECT * FROM pets WHERE id = ?
+    `).bind(petId).first();
+
+    if (!pet) {
+      return new Response(JSON.stringify({ error: 'Pet not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    if (pet.sellerId !== user.id && user.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Access denied' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const updateFields = [];
+    const updateValues = [];
+
+    // Build dynamic update query
+    const updatableFields = ['title', 'species', 'breed', 'sex', 'ageMonths', 'vaccinated', 'dewormed', 'price', 'description', 'locationProvince', 'weight', 'height', 'color', 'personalityTraits'];
+    
+    for (const field of updatableFields) {
+      if (petData[field] !== undefined) {
+        updateFields.push(`${field} = ?`);
+        if (field === 'vaccinated' || field === 'dewormed') {
+          updateValues.push(petData[field] ? 1 : 0);
+        } else if (field === 'personalityTraits' && Array.isArray(petData[field])) {
+          updateValues.push(petData[field].join(','));
+        } else {
+          updateValues.push(petData[field]);
+        }
+      }
+    }
+
+    if (petData.photos) {
+      updateFields.push('photos = ?');
+      updateValues.push(JSON.stringify(petData.photos));
+    }
+
+    if (petData.title) {
+      updateFields.push('slug = ?');
+      updateValues.push(generateSlug(petData.title));
+    }
+
+    updateFields.push('updatedAt = ?');
+    updateValues.push(new Date().toISOString());
+
+    updateValues.push(petId);
+
+    if (updateFields.length > 1) { // More than just updatedAt
+      await env.PET_DB.prepare(`
+        UPDATE pets SET ${updateFields.join(', ')} WHERE id = ?
+      `).bind(...updateValues).run();
+
+      // Log audit
+      await logAudit(env, user.id, 'UPDATE', 'pet', petId, petData);
+    }
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Pet listing updated successfully' 
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Update pet error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to update pet listing' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Delete pet listing
+router.delete('/api/pets/:id', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const petId = request.params.id;
+
+    // Check if pet exists and user owns it (or is admin)
+    const pet = await env.PET_DB.prepare(`
+      SELECT * FROM pets WHERE id = ?
+    `).bind(petId).first();
+
+    if (!pet) {
+      return new Response(JSON.stringify({ error: 'Pet not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    if (pet.sellerId !== user.id && user.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Access denied' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Soft delete (change status to 'deleted')
+    await env.PET_DB.prepare(`
+      UPDATE pets SET status = 'deleted', updatedAt = ? WHERE id = ?
+    `).bind(new Date().toISOString(), petId).run();
+
+    // Log audit
+    await logAudit(env, user.id, 'DELETE', 'pet', petId, { reason: 'User deletion' });
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Pet listing deleted successfully' 
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Delete pet error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to delete pet listing' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Get seller's pets
+router.get('/api/seller/pets', async (request, env) => {
+  const authResult = await requireRole(['seller', 'admin'])(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status') || 'all';
+    const page = parseInt(url.searchParams.get('page')) || 1;
+    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
+    const offset = (page - 1) * limit;
+
+    let whereClause = 'WHERE sellerId = ?';
+    let bindings = [user.id];
+
+    if (status !== 'all') {
+      whereClause += ' AND status = ?';
+      bindings.push(status);
+    }
+
+    const pets = await env.PET_DB.prepare(`
+      SELECT p.*, u.fullName as sellerName
+      FROM pets p
+      LEFT JOIN users u ON p.sellerId = u.id
+      ${whereClause}
+      ORDER BY p.createdAt DESC
+      LIMIT ? OFFSET ?
+    `).bind(...bindings, limit, offset).all();
+
+    const countResult = await env.PET_DB.prepare(`
+      SELECT COUNT(*) as total FROM pets ${whereClause}
+    `).bind(...bindings).first();
+
+    return new Response(JSON.stringify({
+      pets: pets.results.map(pet => ({
+        ...pet,
+        photos: JSON.parse(pet.photos || '[]'),
+        personalityTraits: pet.personalityTraits ? pet.personalityTraits.split(',') : []
+      })),
+      pagination: {
+        page,
+        limit,
+        total: countResult.total,
+        totalPages: Math.ceil(countResult.total / limit)
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Get seller pets error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch pets' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// ===== FAVORITES ENDPOINTS =====
+
+// Add to favorites
+router.post('/api/favorites', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const { petId } = await request.json();
+
+    if (!petId) {
+      return new Response(JSON.stringify({ error: 'petId is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Check if pet exists
+    const pet = await env.PET_DB.prepare(`
+      SELECT id FROM pets WHERE id = ? AND status = 'approved'
+    `).bind(petId).first();
+
+    if (!pet) {
+      return new Response(JSON.stringify({ error: 'Pet not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Check if already favorited
+    const existing = await env.PET_DB.prepare(`
+      SELECT id FROM favorites WHERE userId = ? AND petId = ?
+    `).bind(user.id, petId).first();
+
+    if (existing) {
+      return new Response(JSON.stringify({ error: 'Pet already in favorites' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Add to favorites
+    const id = generateId();
+    await env.PET_DB.prepare(`
+      INSERT INTO favorites (id, userId, petId) VALUES (?, ?, ?)
+    `).bind(id, user.id, petId).run();
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Added to favorites' 
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Add favorite error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to add to favorites' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Remove from favorites
+router.delete('/api/favorites/:petId', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const petId = request.params.petId;
+
+    await env.PET_DB.prepare(`
+      DELETE FROM favorites WHERE userId = ? AND petId = ?
+    `).bind(user.id, petId).run();
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Removed from favorites' 
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Remove favorite error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to remove from favorites' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Get user favorites
+router.get('/api/favorites', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page')) || 1;
+    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
+    const offset = (page - 1) * limit;
+
+    const favorites = await env.PET_DB.prepare(`
+      SELECT p.*, u.fullName as sellerName, f.createdAt as favoritedAt
+      FROM favorites f
+      JOIN pets p ON f.petId = p.id
+      LEFT JOIN users u ON p.sellerId = u.id
+      WHERE f.userId = ? AND p.status = 'approved'
+      ORDER BY f.createdAt DESC
+      LIMIT ? OFFSET ?
+    `).bind(user.id, limit, offset).all();
+
+    const countResult = await env.PET_DB.prepare(`
+      SELECT COUNT(*) as total 
+      FROM favorites f
+      JOIN pets p ON f.petId = p.id
+      WHERE f.userId = ? AND p.status = 'approved'
+    `).bind(user.id).first();
+
+    return new Response(JSON.stringify({
+      favorites: favorites.results.map(pet => ({
+        ...pet,
+        photos: JSON.parse(pet.photos || '[]'),
+        personalityTraits: pet.personalityTraits ? pet.personalityTraits.split(',') : []
+      })),
+      pagination: {
+        page,
+        limit,
+        total: countResult.total,
+        totalPages: Math.ceil(countResult.total / limit)
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Get favorites error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch favorites' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// ===== CART & ORDERS ENDPOINTS =====
+
+// Add to cart
+router.post('/api/cart', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const { petId, quantity = 1 } = await request.json();
+
+    if (!petId) {
+      return new Response(JSON.stringify({ error: 'petId is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Check if pet exists and is available
+    const pet = await env.PET_DB.prepare(`
+      SELECT id, price FROM pets WHERE id = ? AND status = 'approved'
+    `).bind(petId).first();
+
+    if (!pet) {
+      return new Response(JSON.stringify({ error: 'Pet not found or not available' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Get or create cart
+    let cart = await env.PET_DB.prepare(`
+      SELECT id FROM carts WHERE userId = ? AND status = 'active'
+    `).bind(user.id).first();
+
+    if (!cart) {
+      const cartId = generateId();
+      await env.PET_DB.prepare(`
+        INSERT INTO carts (id, userId, status) VALUES (?, ?, 'active')
+      `).bind(cartId, user.id).run();
+      cart = { id: cartId };
+    }
+
+    // Check if item already in cart
+    const existingItem = await env.PET_DB.prepare(`
+      SELECT id, quantity FROM cart_items WHERE cartId = ? AND petId = ?
+    `).bind(cart.id, petId).first();
+
+    if (existingItem) {
+      // Update quantity
+      await env.PET_DB.prepare(`
+        UPDATE cart_items SET quantity = quantity + ? WHERE id = ?
+      `).bind(quantity, existingItem.id).run();
+    } else {
+      // Add new item
+      const itemId = generateId();
+      await env.PET_DB.prepare(`
+        INSERT INTO cart_items (id, cartId, petId, quantity, price)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(itemId, cart.id, petId, quantity, pet.price).run();
+    }
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Added to cart' 
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Add to cart error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to add to cart' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Get cart
+router.get('/api/cart', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+
+    const cartItems = await env.PET_DB.prepare(`
+      SELECT ci.*, p.title, p.photos, p.species, p.breed, u.fullName as sellerName
+      FROM cart_items ci
+      JOIN carts c ON ci.cartId = c.id
+      JOIN pets p ON ci.petId = p.id
+      LEFT JOIN users u ON p.sellerId = u.id
+      WHERE c.userId = ? AND c.status = 'active' AND p.status = 'approved'
+      ORDER BY ci.createdAt DESC
+    `).bind(user.id).all();
+
+    const items = cartItems.results.map(item => ({
+      ...item,
+      photos: JSON.parse(item.photos || '[]')
+    }));
+
+    const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    return new Response(JSON.stringify({
+      items,
+      total,
+      itemCount: items.length
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Get cart error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch cart' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// ===== CHAT/MESSAGING ENDPOINTS =====
+
+// Send message
+router.post('/api/messages', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const { threadId, content, type = 'text' } = await request.json();
+
+    if (!threadId || !content) {
+      return new Response(JSON.stringify({ error: 'threadId and content are required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Check if thread exists and user has access
+    const thread = await env.PET_DB.prepare(`
+      SELECT * FROM threads WHERE id = ? AND (participant1Id = ? OR participant2Id = ?)
+    `).bind(threadId, user.id, user.id).first();
+
+    if (!thread) {
+      return new Response(JSON.stringify({ error: 'Thread not found or access denied' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Create message
+    const messageId = generateId();
+    await env.PET_DB.prepare(`
+      INSERT INTO messages (id, threadId, senderId, content, type)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(messageId, threadId, user.id, content, type).run();
+
+    // Update thread last activity
+    await env.PET_DB.prepare(`
+      UPDATE threads SET lastMessageAt = datetime('now') WHERE id = ?
+    `).bind(threadId).run();
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      messageId,
+      message: 'Message sent' 
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Send message error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to send message' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Get messages for a thread
+router.get('/api/threads/:threadId/messages', async (request, env) => {
+  const authResult = await requireAuth(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const threadId = request.params.threadId;
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page')) || 1;
+    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 50, 100);
+    const offset = (page - 1) * limit;
+
+    // Check if user has access to thread
+    const thread = await env.PET_DB.prepare(`
+      SELECT * FROM threads WHERE id = ? AND (participant1Id = ? OR participant2Id = ?)
+    `).bind(threadId, user.id, user.id).first();
+
+    if (!thread) {
+      return new Response(JSON.stringify({ error: 'Thread not found or access denied' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const messages = await env.PET_DB.prepare(`
+      SELECT m.*, u.fullName as senderName, u.avatarUrl as senderAvatar
+      FROM messages m
+      LEFT JOIN users u ON m.senderId = u.id
+      WHERE m.threadId = ?
+      ORDER BY m.createdAt DESC
+      LIMIT ? OFFSET ?
+    `).bind(threadId, limit, offset).all();
+
+    return new Response(JSON.stringify({
+      messages: messages.results.reverse(), // Reverse for chronological order
+      thread,
+      pagination: {
+        page,
+        limit,
+        hasMore: messages.results.length === limit
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Get messages error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch messages' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// ===== ADMIN ENDPOINTS =====
+
+// Get pending pets for approval
+router.get('/api/admin/pets/pending', async (request, env) => {
+  const authResult = await requireRole(['admin'])(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page')) || 1;
+    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
+    const offset = (page - 1) * limit;
+
+    const pets = await env.PET_DB.prepare(`
+      SELECT p.*, u.fullName as sellerName, u.email as sellerEmail
+      FROM pets p
+      LEFT JOIN users u ON p.sellerId = u.id
+      WHERE p.status = 'pending'
+      ORDER BY p.createdAt ASC
+      LIMIT ? OFFSET ?
+    `).bind(limit, offset).all();
+
+    const countResult = await env.PET_DB.prepare(`
+      SELECT COUNT(*) as total FROM pets WHERE status = 'pending'
+    `).first();
+
+    return new Response(JSON.stringify({
+      pets: pets.results.map(pet => ({
+        ...pet,
+        photos: JSON.parse(pet.photos || '[]'),
+        personalityTraits: pet.personalityTraits ? pet.personalityTraits.split(',') : []
+      })),
+      pagination: {
+        page,
+        limit,
+        total: countResult.total,
+        totalPages: Math.ceil(countResult.total / limit)
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Get pending pets error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch pending pets' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Approve/reject pet
+router.put('/api/admin/pets/:id/status', async (request, env) => {
+  const authResult = await requireRole(['admin'])(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const { user } = authResult;
+    const petId = request.params.id;
+    const { status, reason } = await request.json();
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return new Response(JSON.stringify({ error: 'Invalid status' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Update pet status
+    await env.PET_DB.prepare(`
+      UPDATE pets SET status = ?, updatedAt = ? WHERE id = ?
+    `).bind(status, new Date().toISOString(), petId).run();
+
+    // Log audit
+    await logAudit(env, user.id, 'MODERATE', 'pet', petId, { status, reason });
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: `Pet ${status} successfully` 
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Update pet status error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to update pet status' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
+// Get platform statistics
+router.get('/api/admin/stats', async (request, env) => {
+  const authResult = await requireRole(['admin'])(request, env);
+  if (authResult.error) {
+    return new Response(JSON.stringify(authResult), {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+
+  try {
+    const stats = await Promise.all([
+      env.PET_DB.prepare(`SELECT COUNT(*) as total FROM users`).first(),
+      env.PET_DB.prepare(`SELECT COUNT(*) as total FROM pets WHERE status = 'approved'`).first(),
+      env.PET_DB.prepare(`SELECT COUNT(*) as total FROM pets WHERE status = 'pending'`).first(),
+      env.PET_DB.prepare(`SELECT COUNT(*) as total FROM orders WHERE status = 'completed'`).first(),
+    ]);
+
+    return new Response(JSON.stringify({
+      totalUsers: stats[0].total,
+      approvedPets: stats[1].total,
+      pendingPets: stats[2].total,
+      completedOrders: stats[3].total,
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('Get admin stats error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch statistics' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+});
+
 // 404 handler
 router.all('*', () => {
   return new Response(JSON.stringify({ error: 'Not found' }), {

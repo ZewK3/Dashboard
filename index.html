@@ -1355,10 +1355,123 @@
         </button>
     </div>
 
+    <!-- Cute Floating Paw Prints -->
+    <div class="paw-prints" id="paw-prints">
+        <!-- Paw prints will be dynamically generated here -->
+    </div>
+
     <!-- Scripts -->
     <script type="module" src="assets/js/utils.js"></script>
     <script type="module" src="assets/js/i18n.js"></script>
     <script type="module" src="assets/js/api.js"></script>
     <script type="module" src="assets/js/main.js"></script>
+    
+    <!-- Cute Paw Print Animation Script -->
+    <script>
+        // Create cute floating paw prints
+        function createPawPrint() {
+            const pawContainer = document.getElementById('paw-prints');
+            if (!pawContainer) return;
+
+            const pawPrint = document.createElement('div');
+            pawPrint.className = 'paw-print';
+            
+            // Randomly choose between dog and cat paw prints
+            const isdog = Math.random() > 0.5;
+            pawPrint.classList.add(isdog ? 'dog' : 'cat');
+            
+            // Use Unicode paw print symbols
+            pawPrint.innerHTML = isdog ? '🐾' : '🐾';
+            
+            // Random horizontal position
+            pawPrint.style.left = Math.random() * 100 + '%';
+            
+            // Add some random size variation
+            const size = 0.8 + Math.random() * 0.6; // 0.8x to 1.4x
+            pawPrint.style.fontSize = (1.5 * size) + 'rem';
+            
+            // Random animation duration
+            const duration = 6 + Math.random() * 4; // 6-10 seconds
+            pawPrint.style.animationDuration = duration + 's';
+            
+            pawContainer.appendChild(pawPrint);
+            
+            // Remove the paw print after animation completes
+            setTimeout(() => {
+                if (pawPrint.parentNode) {
+                    pawPrint.parentNode.removeChild(pawPrint);
+                }
+            }, duration * 1000);
+        }
+
+        // Create paw prints at intervals
+        function startPawPrintAnimation() {
+            // Create initial paw prints
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => createPawPrint(), i * 1000);
+            }
+            
+            // Continue creating paw prints every 3-6 seconds
+            setInterval(() => {
+                if (Math.random() > 0.3) { // 70% chance to create a paw print
+                    createPawPrint();
+                }
+            }, 3000 + Math.random() * 3000);
+        }
+
+        // Start the animation when page loads
+        window.addEventListener('load', () => {
+            setTimeout(startPawPrintAnimation, 2000); // Start after 2 seconds
+        });
+
+        // Create favorite hearts when favoriting pets
+        window.createFavoriteHearts = function(element) {
+            const heartsContainer = document.createElement('div');
+            heartsContainer.className = 'favorite-hearts';
+            element.style.position = 'relative';
+            element.appendChild(heartsContainer);
+
+            for (let i = 0; i < 5; i++) {
+                const heart = document.createElement('div');
+                heart.className = 'favorite-heart';
+                heart.innerHTML = '💖';
+                heartsContainer.appendChild(heart);
+            }
+
+            // Remove hearts after animation
+            setTimeout(() => {
+                if (heartsContainer.parentNode) {
+                    heartsContainer.parentNode.removeChild(heartsContainer);
+                }
+            }, 2000);
+        };
+
+        // Add cute click effects to pet cards
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.pet-card')) {
+                const card = e.target.closest('.pet-card');
+                
+                // Add a subtle bounce effect
+                card.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    card.style.transform = 'scale(1)';
+                }, 150);
+                
+                // Create a small paw trail
+                const trail = document.createElement('div');
+                trail.className = 'paw-trail';
+                trail.innerHTML = '🐾';
+                trail.style.left = (e.offsetX || e.layerX) + 'px';
+                trail.style.top = (e.offsetY || e.layerY) + 'px';
+                card.appendChild(trail);
+                
+                setTimeout(() => {
+                    if (trail.parentNode) {
+                        trail.parentNode.removeChild(trail);
+                    }
+                }, 3000);
+            }
+        });
+    </script>
 </body>
 </html>

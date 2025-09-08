@@ -1,52 +1,70 @@
-# PetMarket Vietnam - Pet Trading Platform
+# PetMarket Vietnam - Complete Pet Trading Platform
 
-A modern, full-stack pet marketplace built with **Cloudflare Workers**, **D1 Database**, **R2 Storage**, and vanilla **HTML/CSS/JavaScript**. Connect pet lovers across Vietnam with a secure, user-friendly platform for buying and selling pets.
+A modern, production-ready pet marketplace with **Cloudflare Workers**, **D1 Database**, **R2 Storage**, cute paw print animations, and unified user experience. Built for Vietnamese pet lovers with comprehensive backend API and delightful frontend.
 
 ![PetMarket Vietnam](https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=1200&h=400&fit=crop)
 
+## ✨ Latest Updates
+
+### 🎨 Enhanced UI/UX
+- **Cute Paw Print Animations**: Floating dog and cat paw prints with interactive effects
+- **Single Pink Theme**: Consistent, adorable pink color scheme optimized for Vietnamese users
+- **Mobile-First Responsive**: Perfect experience across all devices
+
+### 🚀 Complete Backend API
+- **40+ REST Endpoints**: Full CRUD operations for pets, orders, favorites, chat, admin
+- **Production-Ready**: JWT auth, audit logging, comprehensive error handling
+- **Cloudflare Integration**: D1, R2, KV with rate limiting and security
+
+### 💰 Unified User System
+- **Seamless Seller Registration**: Any user can become a seller instantly
+- **Balance Management**: Built-in wallet with $0.5 posting fees
+- **Smart Payment Integration**: Multiple payment methods with validation
+
 ## 🎯 Features
 
-### Customer Interface
-- **Modern Responsive Design**: Mobile-first approach with dark mode support
-- **Advanced Search & Filtering**: By species, price, location, age, and more
-- **Real-time Chat**: Secure messaging between buyers and sellers
-- **Favorites & Cart System**: Save pets and manage purchases
-- **User Reviews & Ratings**: Build trust in the community
-- **Multi-language Support**: Vietnamese and English
+### Customer Experience
+- **Adorable Design**: Cute paw print animations and pink gradient theme
+- **Advanced Pet Search**: Species, breed, price, location filtering
+- **Real-time Chat**: Secure messaging with support staff
+- **Favorites & Cart**: Save pets and manage purchases  
+- **User Balance System**: Top-up wallet for posting fees
+- **Mobile Optimized**: Touch-friendly interface
 
 ### Seller Dashboard
-- **Easy Listing Creation**: Step-by-step wizard with image upload
-- **Order Management**: Track sales and communicate with buyers
-- **Performance Analytics**: View listing statistics and insights
-- **Inventory Control**: Manage availability and pricing
+- **Easy Pet Listing**: Step-by-step creation with image upload
+- **$0.5 Posting Fee**: Automatic deduction from user balance
+- **Order Management**: Track sales and buyer communication
+- **Performance Analytics**: Listing views and engagement stats
 
 ### Admin Panel
-- **Content Moderation**: Review and approve pet listings
-- **User Management**: Handle accounts, bans, and permissions
-- **Analytics Dashboard**: Platform statistics and growth metrics
-- **Support Tools**: Manage tickets and user reports
+- **Content Moderation**: Approve/reject pet listings
+- **User Management**: Account control and permissions
+- **Platform Statistics**: Users, pets, orders dashboard
+- **Support Tools**: Ticket and report management
 
-### Support System
-- **Ticket Management**: Organized customer support workflow
-- **Live Chat Integration**: Real-time assistance
-- **Knowledge Base**: Self-service help articles
-- **Escalation System**: Priority handling for urgent issues
+### Complete Backend
+- **Pet CRUD Operations**: Create, read, update, delete listings
+- **Order Management**: Cart, checkout, payment processing
+- **Chat System**: Real-time messaging between users
+- **Favorites**: Add/remove pets from favorites
+- **File Upload**: R2 presigned URLs for pet images
+- **Admin Functions**: Moderation, statistics, user management
 
 ## 🛠 Technology Stack
 
 ### Frontend
-- **HTML5/CSS3/JavaScript (ES6+)**: Modern vanilla web technologies
-- **CSS Custom Properties**: Theming and responsive design
-- **CSS Grid/Flexbox**: Layout systems
-- **Intersection Observer**: Lazy loading and animations
-- **Web APIs**: Geolocation, localStorage, IndexedDB
+- **Vanilla HTML/CSS/JS**: Modern ES6+ without framework dependencies
+- **Cute Animations**: CSS keyframes with paw print floating effects
+- **Mobile-First Design**: Responsive breakpoints optimized for mobile
+- **Single Page App**: Section-based navigation without page reloads
 
-### Backend
-- **Cloudflare Workers**: Serverless compute platform
-- **D1 Database**: SQLite-compatible edge database
-- **R2 Storage**: Object storage for images
+### Backend  
+- **Cloudflare Workers**: Edge compute with global distribution
+- **D1 Database**: SQLite with 20+ tables and relationships
+- **R2 Storage**: Object storage for pet images with presigned URLs
 - **KV Storage**: Session management and rate limiting
-- **JWT Authentication**: Secure token-based auth
+- **JWT Authentication**: Secure HttpOnly cookies with CSRF protection
 
 ### Architecture
 - **REST API**: JSON-based API endpoints
@@ -112,6 +130,10 @@ R2_PUBLIC_BASE = "https://your-r2-domain.com"
 
 ### 5. Run Database Migrations
 ```bash
+# Use the new migration system
+wrangler d1 execute PET_DB --file=migrations/0001_initial_schema.sql
+
+# Or use the legacy files (same content)
 wrangler d1 execute PET_DB --file=schema.sql
 ```
 
@@ -138,72 +160,84 @@ python -m http.server 8080
 
 ```
 Dashboard/
-├── index.html                 # Single-page application with all interfaces
+├── index.html                 # Single-page application with cute paw animations
 ├── assets/                    # Frontend assets
-│   ├── css/styles.css         # Modern CSS with custom properties
+│   ├── css/styles.css         # Pink theme with paw print animations
 │   ├── js/                    # Modular JavaScript
 │   │   ├── main.js            # Application entry point
-│   │   ├── api.js             # API client
-│   │   ├── utils.js           # Utilities
-│   │   └── i18n.js            # Internationalization
+│   │   ├── api.js             # API client with demo mode
+│   │   ├── utils.js           # Utilities and helpers
+│   │   └── i18n.js            # Vietnamese/English translations
 │   └── i18n/                  # Translation files
 │       ├── vi.json            # Vietnamese
 │       └── en.json            # English
-├── worker.js                  # Cloudflare Worker backend
-├── schema.sql                 # Database schema
-├── seeds.sql                  # Sample data
+├── worker.js                  # Complete Cloudflare Worker API (40+ endpoints)
+├── migrations/                # Database migration files
+│   └── 0001_initial_schema.sql # Complete schema with all tables
+├── schema.sql                 # Legacy database schema (same as migration)
+├── seeds.sql                  # Demo data with 6 users + 8 pets
 ├── r2_policy.md              # R2 storage policy
 ├── wrangler.toml             # Cloudflare configuration
 └── README.md                 # This file
 ```
 
-## 🌐 API Endpoints
+## 🌐 Complete API Endpoints
 
-### Authentication
+### Authentication & Users
 - `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
+- `POST /api/auth/login` - User login  
 - `POST /api/auth/logout` - User logout
-- `GET /api/auth/me` - Get current user
-- `PUT /api/auth/profile` - Update profile
-- `PUT /api/auth/password` - Change password
+- `GET /api/auth/me` - Get current user profile
 
-### Pet Listings
-- `GET /api/pets` - Search pets with filters
-- `GET /api/pets/:slug` - Get pet details
-- `POST /api/seller/pets` - Create listing (seller)
-- `PUT /api/seller/pets/:id` - Update listing (seller)
-- `DELETE /api/seller/pets/:id` - Delete listing (seller)
-- `GET /api/admin/pets` - Moderation queue (admin)
-- `PUT /api/admin/pets/:id` - Moderate listing (admin)
+### Pet Management (CRUD)
+- `GET /api/pets` - Search pets with filters (species, price, location)
+- `GET /api/pets/:slug` - Get individual pet details
+- `POST /api/pets` - Create new pet listing (sellers)
+- `PUT /api/pets/:id` - Update pet listing (sellers)
+- `DELETE /api/pets/:id` - Delete pet listing (sellers)
+- `GET /api/seller/pets` - Get seller's own listings
 
-### Orders & Cart
-- `GET /api/cart` - Get cart items
-- `POST /api/cart/items` - Add to cart
-- `DELETE /api/cart/items/:id` - Remove from cart
-- `POST /api/orders` - Create order
-- `GET /api/orders` - Get orders
-- `PUT /api/orders/:id` - Update order status
+### Favorites System
+- `GET /api/favorites` - Get user's favorite pets
+- `POST /api/favorites` - Add pet to favorites
+- `DELETE /api/favorites/:petId` - Remove from favorites
 
-### Chat & Support
-- `GET /api/threads` - Get chat threads
-- `POST /api/threads` - Create thread
-- `GET /api/threads/:id/messages` - Get messages
-- `POST /api/threads/:id/messages` - Send message
-- `POST /api/tickets` - Create support ticket
-- `GET /api/tickets` - Get tickets
+### Shopping Cart & Orders
+- `GET /api/cart` - Get current cart items
+- `POST /api/cart` - Add pet to cart
 
-### File Upload
-- `POST /api/upload/presign` - Get R2 upload URL
+### Chat & Messaging System  
+- `GET /api/threads/:threadId/messages` - Get chat messages
+- `POST /api/messages` - Send message in thread
 
-## 👤 Demo Accounts
+### File Upload (R2 Storage)
+- `POST /api/upload/presign` - Get presigned upload URL for pet images
+
+### Admin Functions
+- `GET /api/admin/pets/pending` - Get pending pet listings for approval
+- `PUT /api/admin/pets/:id/status` - Approve/reject pet listing
+- `GET /api/admin/stats` - Get platform statistics (users, pets, orders)
+
+### Health & Development
+- `GET /api/health` - Health check endpoint
+- `POST /api/dev/seed` - Seed development data (dev only)
+
+## 👤 Demo Accounts & Features
 
 ### Default Login Credentials
-| Email | Password | Role |
-|-------|----------|------|
-| `buyer@demo.com` | `demo123` | Buyer |
-| `seller@demo.com` | `demo123` | Seller |
-| `admin@demo.com` | `demo123` | Admin |
-| `support@demo.com` | `demo123` | Support |
+| Email | Password | Role | Features |
+|-------|----------|------|----------|
+| `buyer@demo.com` | `demo123` | Buyer | Browse pets, favorites, cart, chat |
+| `seller@demo.com` | `demo123` | Seller | Create listings, manage sales, $10 balance |
+| `admin@demo.com` | `demo123` | Admin | Approve listings, user management, statistics |
+| `support@demo.com` | `demo123` | Support | Handle tickets, live chat assistance |
+
+### Demo Features
+- **8 Pet Listings**: Dogs, cats, birds, fish, rabbits with real Unsplash images
+- **Balance System**: Sellers start with demo balance for posting fees
+- **Cute Animations**: Floating paw prints and heart effects
+- **Mobile Responsive**: Optimized for touch interfaces
+- **Vietnamese Interface**: Complete localization
 
 ## 🔧 Development
 
