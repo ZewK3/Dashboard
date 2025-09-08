@@ -117,6 +117,8 @@ const updateAuthUI = (isLoggedIn) => {
   const authButtons = $('#auth-buttons');
   const userMenu = $('#user-menu');
   const adminNav = $('#admin-nav');
+  const cartIcon = $('#cart-icon');
+  const notificationIcon = $('#notification-icon');
   
   if (isLoggedIn && currentUser) {
     // Hide auth buttons, show user menu
@@ -156,6 +158,10 @@ const updateAuthUI = (isLoggedIn) => {
       updateNavigationByRole(currentUser.role);
     }
     
+    // Show cart and notification icons when authenticated
+    if (cartIcon) cartIcon.style.display = 'block';
+    if (notificationIcon) notificationIcon.style.display = 'block';
+    
     // Show admin navigation if user is admin
     if (adminNav) {
       adminNav.style.display = currentUser.role === 'admin' ? 'block' : 'none';
@@ -165,6 +171,10 @@ const updateAuthUI = (isLoggedIn) => {
     if (authButtons) authButtons.style.display = 'flex';
     if (userMenu) userMenu.style.display = 'none';
     if (adminNav) adminNav.style.display = 'none';
+    
+    // Hide cart and notification icons when not authenticated
+    if (cartIcon) cartIcon.style.display = 'none';
+    if (notificationIcon) notificationIcon.style.display = 'none';
   }
 };
 

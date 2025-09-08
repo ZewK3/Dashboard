@@ -6,23 +6,32 @@
     <title>PetMarket Vietnam - Thú Cưng Tại Nhà</title>
     
     <!-- SEO Meta Tags -->
-    <meta name="description" content="Kết nối những người yêu thú cưng trên toàn quốc. Mua bán thú cưng uy tín, an toàn với hệ thống đánh giá và bảo vệ người dùng.">
-    <meta name="keywords" content="thú cưng, mua bán thú cưng, chó mèo, cá cảnh, chim cảnh, Vietnam pets">
+    <meta name="description" content="PetMarket Vietnam - Kết nối những người yêu thú cưng trên toàn quốc. Mua bán thú cưng uy tín, an toàn với hệ thống đánh giá và bảo vệ người dùng. Chó, mèo, cá cảnh, chim cảnh chất lượng cao.">
+    <meta name="keywords" content="thú cưng, mua bán thú cưng, chó mèo, cá cảnh, chim cảnh, Vietnam pets, pet marketplace, thú cưng Việt Nam, chó cảnh, mèo cảnh, động vật nuôi">
     <meta name="author" content="PetMarket Vietnam">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="vi-VN">
+    <meta name="geo.region" content="VN">
+    <meta name="geo.country" content="Vietnam">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://petmarket.vn/">
     
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="PetMarket Vietnam - Thú Cưng Tại Nhà">
-    <meta property="og:description" content="Kết nối những người yêu thú cưng trên toàn quốc. Mua bán thú cưng uy tín, an toàn.">
-    <meta property="og:image" content="/assets/img/brand/og-image.jpg">
+    <meta property="og:description" content="Kết nối những người yêu thú cưng trên toàn quốc. Mua bán thú cưng uy tín, an toàn với hệ thống đánh giá và bảo vệ người dùng.">
+    <meta property="og:image" content="https://petmarket.vn/assets/img/brand/og-image.jpg">
     <meta property="og:url" content="https://petmarket.vn">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="PetMarket Vietnam">
+    <meta property="og:locale" content="vi_VN">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="PetMarket Vietnam - Thú Cưng Tại Nhà">
-    <meta name="twitter:description" content="Kết nối những người yêu thú cưng trên toàn quốc">
-    <meta name="twitter:image" content="/assets/img/brand/twitter-card.jpg">
+    <meta name="twitter:description" content="Kết nối những người yêu thú cưng trên toàn quốc. Mua bán thú cưng uy tín, an toàn.">
+    <meta name="twitter:image" content="https://petmarket.vn/assets/img/brand/twitter-card.jpg">
+    <meta name="twitter:site" content="@PetMarketVN">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/assets/img/brand/favicon.svg">
@@ -45,13 +54,44 @@
         "@context": "https://schema.org",
         "@type": "Organization",
         "name": "PetMarket Vietnam",
+        "alternateName": "PetMarket VN",
         "url": "https://petmarket.vn",
         "logo": "https://petmarket.vn/assets/img/brand/logo.svg",
-        "description": "Kết nối những người yêu thú cưng trên toàn quốc",
+        "description": "Kết nối những người yêu thú cưng trên toàn quốc. Mua bán thú cưng uy tín, an toàn.",
+        "address": {
+            "@type": "PostalAddress",
+            "addressCountry": "VN",
+            "addressRegion": "Hồ Chí Minh"
+        },
         "contactPoint": {
             "@type": "ContactPoint",
             "telephone": "+84-xxx-xxx-xxx",
-            "contactType": "customer service"
+            "contactType": "customer service",
+            "availableLanguage": "vi"
+        },
+        "sameAs": [
+            "https://facebook.com/petmarket.vn",
+            "https://instagram.com/petmarket.vn"
+        ],
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://petmarket.vn/search?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+        }
+    }
+    </script>
+    
+    <!-- Additional Structured Data for Website -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "PetMarket Vietnam",
+        "url": "https://petmarket.vn",
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://petmarket.vn/search?q={search_term_string}",
+            "query-input": "required name=search_term_string"
         }
     }
     </script>
@@ -91,10 +131,6 @@
                         <i class="fas fa-heart"></i>
                         <span data-i18n="nav.browse">Duyệt thú cưng</span>
                     </button>
-                    <button class="nav-link nav-btn" data-section="seller-portal" onclick="checkAuthentication('seller')">
-                        <i class="fas fa-plus-circle cute-icon"></i>
-                        <span data-i18n="nav.sell">Đăng tin</span>
-                    </button>
                     <a href="admin.html" class="nav-link nav-btn" style="display: none;" id="admin-nav">
                         <i class="fas fa-cog cute-icon"></i>
                         <span data-i18n="nav.admin">Quản trị</span>
@@ -107,26 +143,14 @@
                 
                 <!-- User Actions -->
                 <div class="user-actions">
-                    <!-- Trust Indicators -->
-                    <div class="trust-indicators">
-                        <div class="trust-badge">
-                            <i class="fas fa-shield-alt"></i>
-                            <span class="trust-text">An toàn</span>
-                        </div>
-                        <div class="trust-badge">
-                            <i class="fas fa-user-check"></i>
-                            <span class="trust-text">Đã xác minh</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Cart Icon with Badge -->
-                    <button class="cart-icon" id="cart-icon" title="Giỏ hàng">
+                    <!-- Cart Icon with Badge (hidden by default, shown when authenticated) -->
+                    <button class="cart-icon" id="cart-icon" title="Giỏ hàng" style="display: none;">
                         <i class="fas fa-shopping-cart"></i>
                         <span class="cart-badge" id="cart-badge">0</span>
                     </button>
                     
-                    <!-- Notification Bell -->
-                    <button class="notification-icon" id="notification-icon" title="Thông báo">
+                    <!-- Notification Bell (hidden by default, shown when authenticated) -->
+                    <button class="notification-icon" id="notification-icon" title="Thông báo" style="display: none;">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notification-badge" style="display: none;">0</span>
                     </button>
@@ -140,7 +164,6 @@
                     <!-- Auth Buttons -->
                     <div class="auth-buttons" id="auth-buttons">
                         <button class="btn btn-outline" id="login-btn" data-i18n="auth.login">Đăng nhập</button>
-                        <button class="btn btn-primary" id="register-btn" data-i18n="auth.register">Đăng ký</button>
                     </div>
                     
                     <!-- User Menu (hidden by default) -->
@@ -419,60 +442,6 @@
                         <div class="stat-label">Tỷ lệ hài lòng</div>
                         <div class="stat-icon">
                             <i class="fas fa-thumbs-up"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Testimonials Section -->
-        <section class="testimonials-section">
-            <div class="container">
-                <h2 class="section-title">Khách hàng nói gì về chúng tôi</h2>
-                <div class="testimonials-grid">
-                    <div class="testimonial-card">
-                        <div class="testimonial-avatar">
-                            <img src="https://images.unsplash.com/photo-1494790108755-2616b612b1e6?w=80&h=80&fit=crop&crop=face" alt="Nguyễn Thị Lan">
-                        </div>
-                        <div class="testimonial-content">
-                            <p class="testimonial-text">
-                                "Tôi đã mua chú Golden Retriever ở đây. Quy trình rất chuyên nghiệp, 
-                                thú cưng khỏe mạnh và người bán rất tận tâm hỗ trợ."
-                            </p>
-                            <div class="testimonial-author">
-                                <strong>Nguyễn Thị Lan</strong>
-                                <span>Khách hàng từ Hà Nội</span>
-                            </div>
-                            <div class="testimonial-rating">
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="testimonial-card">
-                        <div class="testimonial-avatar">
-                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face" alt="Trần Văn Minh">
-                        </div>
-                        <div class="testimonial-content">
-                            <p class="testimonial-text">
-                                "Là người bán, tôi rất hài lòng với dịch vụ. Nhiều khách hàng tiềm năng, 
-                                hệ thống thanh toán minh bạch và an toàn."
-                            </p>
-                            <div class="testimonial-author">
-                                <strong>Trần Văn Minh</strong>
-                                <span>Người bán tại TP.HCM</span>
-                            </div>
-                            <div class="testimonial-rating">
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                            </div>
                         </div>
                     </div>
                 </div>

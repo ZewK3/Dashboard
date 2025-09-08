@@ -3628,19 +3628,42 @@ a:hover {
 /* Additional mobile navigation improvements */
 @media (max-width: 768px) {
   .header {
-    padding: var(--space-3) 0;
+    padding: var(--space-2) 0;
   }
   
   .header-content {
-    gap: var(--space-2);
+    gap: var(--space-1);
+    padding: 0 var(--space-3);
+    flex-wrap: nowrap;
+    overflow-x: hidden;
+  }
+  
+  .logo {
+    flex-shrink: 0;
   }
   
   .logo-text {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
+  }
+  
+  .search-container {
+    flex: 1;
+    min-width: 0;
   }
   
   .search-bar {
-    max-width: 180px;
+    max-width: none;
+    width: 100%;
+  }
+  
+  .search-input {
+    font-size: 1rem;
+    padding: var(--space-2);
+  }
+  
+  .user-actions {
+    flex-shrink: 0;
+    gap: var(--space-1);
   }
   
   .nav-primary {
@@ -3649,6 +3672,12 @@ a:hover {
   
   .auth-buttons {
     gap: var(--space-1);
+  }
+  
+  .auth-buttons .btn {
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.875rem;
+    white-space: nowrap;
   }
   
   .btn-sm {
@@ -3663,6 +3692,8 @@ a:hover {
   
   .container {
     padding: 0 var(--space-3);
+    max-width: 100%;
+    overflow-x: hidden;
   }
   
   /* Improve mobile forms */
@@ -4661,6 +4692,71 @@ a:hover {
     min-width: 14px;
     height: 14px;
   }
+  
+  /* Extreme mobile optimization */
+  .header-content {
+    padding: 0 var(--space-2);
+  }
+  
+  .logo-text {
+    font-size: 1rem;
+  }
+  
+  .search-input {
+    font-size: 0.9rem;
+    padding: var(--space-1);
+  }
+  
+  .auth-buttons .btn {
+    padding: var(--space-1) var(--space-1);
+    font-size: 0.8rem;
+  }
+  
+  .user-actions {
+    gap: 0;
+  }
+  
+  .lang-toggle {
+    font-size: 0.8rem;
+    padding: var(--space-1);
+  }
+  
+  /* Fix mobile overflow */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  
+  .header {
+    width: 100%;
+    max-width: 100vw;
+    overflow: hidden;
+  }
+  
+  /* Hero section mobile */
+  .hero {
+    padding: var(--space-8) 0;
+  }
+  
+  .hero-title {
+    font-size: 1.5rem;
+    line-height: 1.3;
+  }
+  
+  .hero-subtitle {
+    font-size: 0.9rem;
+  }
+  
+  .hero-actions {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  
+  .hero-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
   
   .stats-grid {
     grid-template-columns: 1fr;
