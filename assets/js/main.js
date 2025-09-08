@@ -4,7 +4,7 @@
  */
 
 import utils, { $, $$, on, storage, url, debounce } from './utils.js';
-import api, { setBaseUrl, healthCheck, devSeed } from './api.js';
+import api from './api.js';
 import i18n from './i18n.js';
 
 // Application state
@@ -16,8 +16,7 @@ const CONFIG = {
   API_BASE_URL: window.location.hostname === 'localhost' ? 'http://localhost:8787' : 'https://api.petmarket.vn',
   DEFAULT_LANGUAGE: 'vi',
   DEBOUNCE_DELAY: 300,
-  TOAST_DURATION: 5000,
-  DEMO_MODE: true // Enable demo mode for testing
+  TOAST_DURATION: 5000
 };
 
 // Initialize application
@@ -25,15 +24,7 @@ const init = async () => {
   if (isInitialized) return;
   
   try {
-    // Set API base URL
-    setBaseUrl(CONFIG.API_BASE_URL);
-    
-    // Show demo mode notification
-    if (CONFIG.DEMO_MODE) {
-      setTimeout(() => {
-        showToast('🎮 Chế độ demo đang hoạt động - sử dụng dữ liệu mẫu', 'info');
-      }, 1000);
-    }
+    // Production mode - direct initialization
     
     // Initialize internationalization
     await i18n.init(CONFIG.DEFAULT_LANGUAGE);
@@ -462,9 +453,6 @@ const showSection = (sectionId) => {
   
   const activeNavs = $$(`[data-section="${sectionId}"]`);
   activeNavs.forEach(nav => nav.classList.add('active'));
-
-// Make showSection globally accessible for onclick handlers
-window.showSection = showSection;
 
   // Initialize section-specific functionality
   if (sectionId === 'buyer-portal') {
@@ -1839,29 +1827,14 @@ const animateStatNumbers = () => {
   });
 };
 
-// Perform health check
+// Performance monitoring
 const performHealthCheck = async () => {
   try {
-    await healthCheck();
-    console.log('API health check passed');
+    // Production API - no specific health check endpoint needed
+    console.log('Production API mode enabled');
   } catch (error) {
-    console.warn('API health check failed:', error);
+    console.warn('API check failed:', error);
     showToast('Kết nối API không ổn định. Một số tính năng có thể bị hạn chế.', 'warning');
-  }
-};
-
-// Seed development data
-const seedDevelopmentData = async () => {
-  try {
-    // Only seed if no data exists
-    const hasData = storage.get('dev_seeded');
-    if (!hasData) {
-      await devSeed();
-      storage.set('dev_seeded', true);
-      console.log('Development data seeded successfully');
-    }
-  } catch (error) {
-    console.warn('Development seeding failed:', error);
   }
 };
 
