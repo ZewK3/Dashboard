@@ -1027,6 +1027,42 @@ const openModal = (modalId) => {
   }
 };
 
+const showModal = (modalId, content = null) => {
+  let modal = $(`#${modalId}`);
+  
+  // Create modal if it doesn't exist
+  if (!modal) {
+    modal = utils.createElement('div', {
+      id: modalId,
+      className: 'modal',
+      innerHTML: `
+        <div class="modal-content">
+          <div class="modal-body"></div>
+        </div>
+      `
+    });
+    document.body.appendChild(modal);
+  }
+  
+  // Update content if provided
+  if (content) {
+    const modalBody = modal.querySelector('.modal-body');
+    if (modalBody) {
+      modalBody.innerHTML = content;
+    } else {
+      // If no modal-body exists, replace the entire modal-content
+      const modalContent = modal.querySelector('.modal-content');
+      if (modalContent) {
+        modalContent.innerHTML = content;
+      }
+    }
+  }
+  
+  // Show the modal
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+};
+
 const closeModal = (modalId) => {
   const modal = $(`#${modalId}`);
   if (modal) {
@@ -2067,6 +2103,7 @@ window.app = {
   showLoading,
   hideLoading,
   openModal,
+  showModal,
   closeModal,
   getCurrentUser: () => currentUser,
   utils,
@@ -2082,6 +2119,7 @@ window.i18n = i18n;
 // Make functions globally accessible for onclick handlers
 window.closeModal = closeModal;
 window.openModal = openModal;
+window.showModal = showModal;
 window.showSection = showSection;
 
 // User balance and seller functionality
