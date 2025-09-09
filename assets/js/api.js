@@ -109,10 +109,18 @@ const authAPI = {
     });
   },
 
-  async login(email, password) {
+  async login(emailOrData, password) {
+    // Support both login(email, password) and login({email, password}) formats
+    let loginData;
+    if (typeof emailOrData === 'object' && emailOrData.email) {
+      loginData = { email: emailOrData.email, password: emailOrData.password };
+    } else {
+      loginData = { email: emailOrData, password: password };
+    }
+
     const result = await apiRequest('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify(loginData)
     });
 
     if (result.success && result.data.token) {

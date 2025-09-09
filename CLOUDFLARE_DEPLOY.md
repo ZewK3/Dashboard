@@ -119,7 +119,7 @@ Variable name: RATELIMIT_KV → KV namespace: RATELIMIT_KV
 #### 4.4.3 D1 Database Bindings
 1. **"D1 database bindings"** → **"Add binding"**
 ```
-Variable name: PET_DB → D1 database: pet_market_db
+Variable name: DB → D1 database: pet_market_db
 ```
 
 #### 4.4.4 R2 Bucket Bindings
@@ -253,6 +253,27 @@ https://your-api-domain.com/api/pets
 **4. Frontend không kết nối API:**
 - Kiểm tra environment variables
 - Verify CORS headers trong worker
+
+**5. API Errors "Cannot read properties of undefined (reading 'prepare')":**
+- **Nguyên nhân**: D1 database binding chưa được cấu hình
+- **Giải pháp**: 
+  1. Vào Worker → Settings → Variables → D1 database bindings
+  2. Thêm binding: `Variable name: DB` → `D1 database: pet_market_db`
+  3. Save và redeploy worker
+
+**6. "Email and password are required" khi gửi đúng data:**
+- **Nguyên nhân**: Request body parsing issue
+- **Giải pháp**: Đảm bảo gửi Content-Type: application/json
+- Worker đã được fix để handle cả hai format
+
+**7. "Missing or invalid authorization header":**
+- **Nguyên nhân**: Frontend chưa lưu/gửi auth token đúng cách
+- **Giải pháp**: Login thành công sẽ tự động lưu token vào localStorage
+
+### Debug Steps:
+1. **Check Worker Logs**: Tab Logs trong Cloudflare Dashboard
+2. **Test API directly**: Dùng curl hoặc Postman test endpoints
+3. **Verify Bindings**: Settings → Variables → kiểm tra tất cả bindings
 
 ### Support:
 - 📧 Email: support@petmarket.vn

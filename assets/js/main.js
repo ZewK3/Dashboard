@@ -941,11 +941,17 @@ const handleLogin = async (event) => {
   
   try {
     showLoading();
-    const response = await api.authAPI.login(formData);
+    const result = await api.authAPI.login(formData);
     
-    window.dispatchEvent(new CustomEvent('auth:login', {
-      detail: { user: response.user, token: response.token }
-    }));
+    if (result.success) {
+      showToast('Đăng nhập thành công!', 'success');
+      window.dispatchEvent(new CustomEvent('auth:login', {
+        detail: { user: result.data.user, token: result.data.token }
+      }));
+      closeModal('loginModal');
+    } else {
+      showToast(result.error || 'Đăng nhập thất bại', 'error');
+    }
     
   } catch (error) {
     showToast(api.handleApiError(error, false), 'error');
@@ -962,11 +968,16 @@ const handleRegister = async (event) => {
   
   try {
     showLoading();
-    const response = await api.authAPI.register(formData);
+    const result = await api.authAPI.register(formData);
     
-    window.dispatchEvent(new CustomEvent('auth:register', {
-      detail: { user: response.user, token: response.token }
-    }));
+    if (result.success) {
+      showToast('Đăng ký thành công!', 'success');
+      closeModal('registerModal');
+      // Auto open login modal after successful registration
+      setTimeout(() => openModal('loginModal'), 500);
+    } else {
+      showToast(result.error || 'Đăng ký thất bại', 'error');
+    }
     
   } catch (error) {
     showToast(api.handleApiError(error, false), 'error');

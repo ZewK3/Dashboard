@@ -82,6 +82,12 @@ async function authenticate(request, env) {
   const token = authHeader.substring(7);
   
   try {
+    // Check if DB is available
+    if (!env.DB) {
+      console.error('Database not configured. Please bind a D1 database.');
+      return { error: 'Database not available', status: 500 };
+    }
+
     // Query user by token
     const stmt = env.DB.prepare('SELECT u.* FROM users u JOIN user_sessions s ON u.id = s.user_id WHERE s.token = ? AND s.expires_at > ?');
     const user = await stmt.bind(token, new Date().toISOString()).first();
@@ -92,6 +98,7 @@ async function authenticate(request, env) {
     
     return { user };
   } catch (error) {
+    console.error('Authentication error:', error);
     return { error: 'Authentication failed', status: 500 };
   }
 }
@@ -117,7 +124,14 @@ function requireSupport(user) {
 // Register new user
 async function handleRegister(request, env, origin) {
   try {
-    const { name, email, password } = await request.json();
+    // Check if DB is available
+    if (!env.DB) {
+      console.error('Database not configured. Please bind a D1 database.');
+      return jsonResponse({ error: 'Database not available' }, 500, origin);
+    }
+
+    const body = await request.json();
+    const { name, email, password } = body;
     
     if (!name || !email || !password) {
       return jsonResponse({ error: 'Name, email and password are required' }, 400, origin);
@@ -142,6 +156,7 @@ async function handleRegister(request, env, origin) {
     
     return jsonResponse({ message: 'User registered successfully', user }, 201, origin);
   } catch (error) {
+    console.error('Registration error:', error);
     return jsonResponse({ error: 'Registration failed', details: error.message }, 500, origin);
   }
 }
@@ -149,7 +164,14 @@ async function handleRegister(request, env, origin) {
 // Login user
 async function handleLogin(request, env, origin) {
   try {
-    const { email, password } = await request.json();
+    // Check if DB is available
+    if (!env.DB) {
+      console.error('Database not configured. Please bind a D1 database.');
+      return jsonResponse({ error: 'Database not available' }, 500, origin);
+    }
+
+    const body = await request.json();
+    const { email, password } = body;
     
     if (!email || !password) {
       return jsonResponse({ error: 'Email and password are required' }, 400, origin);
@@ -183,6 +205,7 @@ async function handleLogin(request, env, origin) {
     
     return jsonResponse({ message: 'Login successful', user: userResponse, token }, 200, origin);
   } catch (error) {
+    console.error('Login error:', error);
     return jsonResponse({ error: 'Login failed', details: error.message }, 500, origin);
   }
 }
@@ -226,6 +249,12 @@ async function handleLogout(request, env, origin) {
 // Get all pets with filters
 async function handleGetPets(request, env, origin) {
   try {
+    // Check if DB is available
+    if (!env.DB) {
+      console.error('Database not configured. Please bind a D1 database.');
+      return jsonResponse({ error: 'Database not available' }, 500, origin);
+    }
+
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get('limit')) || 20;
     const offset = parseInt(url.searchParams.get('offset')) || 0;
@@ -269,6 +298,7 @@ async function handleGetPets(request, env, origin) {
     
     return jsonResponse({ pets: pets.results || [] }, 200, origin);
   } catch (error) {
+    console.error('Get pets error:', error);
     return jsonResponse({ error: 'Failed to fetch pets', details: error.message }, 500, origin);
   }
 }
