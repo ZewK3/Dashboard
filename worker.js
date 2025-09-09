@@ -1,1875 +1,899 @@
-/**
- * Pet Marketplace Cloudflare Worker API
- * Full-stack backend with D1, R2, KV, JWT authentication, RBAC, and comprehensive endpoints
- * Pure JavaScript version for direct Cloudflare Dashboard deployment
- */
+const ALLOWED_ORIGIN = "https://zewk.fun";
 
-// Simple router implementation (no external dependencies)
-class SimpleRouter {
-  constructor() {
-    this.routes = [];
-  }
+// Hàm tiện ích trả về JSON response
+function jsonResponse(body, status, origin = ALLOWED_ORIGIN) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
 
-  addRoute(method, path, handler) {
-    this.routes.push({ method: method.toUpperCase(), path, handler });
-  }
+// Hàm tiện ích xử lý CORS cho OPTIONS request
+function handleOptionsRequest() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
 
-  get(path, handler) {
-    this.addRoute('GET', path, handler);
-  }
+// Hàm mã hóa mật khẩu bằng SHA-256
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
-  post(path, handler) {
-    this.addRoute('POST', path, handler);
-  }
+// Middleware kiểm tra phiên người dùng
+async function checkSessionMiddleware(token, db, allowedOrigin) {
+  if (!token) return jsonResponse({ message: "Thiếu token!" }, 401, allowedOrigin);
 
-  put(path, handler) {
-    this.addRoute('PUT', path, handler);
-  }
+  try {
+    const session = await db
+      .prepare("SELECT employeeId, expiresAt FROM sessions WHERE token = ?")
+      .bind(token)
+      .first();
 
-  delete(path, handler) {
-    this.addRoute('DELETE', path, handler);
-  }
+    if (!session) return jsonResponse({ message: "Phiên không tồn tại!" }, 401, allowedOrigin);
 
-  options(path, handler) {
-    this.addRoute('OPTIONS', path, handler);
-  }
+    const now = new Date();
+    const expiresAt = new Date(session.expiresAt);
+    if (now > expiresAt) return jsonResponse({ message: "Phiên đã hết hạn!" }, 401, allowedOrigin);
 
-  all(path, handler) {
-    this.addRoute('*', path, handler);
-  }
-
-  matchRoute(method, pathname) {
-    for (const route of this.routes) {
-      if (route.method !== '*' && route.method !== method) continue;
-      
-      const routeRegex = this.pathToRegex(route.path);
-      const match = pathname.match(routeRegex);
-      
-      if (match) {
-        const params = this.extractParams(route.path, pathname);
-        return { handler: route.handler, params };
-      }
-    }
-    return null;
-  }
-
-  pathToRegex(path) {
-    // Convert path like "/api/pets/:id" to regex
-    const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp('^' + escapedPath.replace(/:\w+/g, '([^/]+)') + '$');
-  }
-
-  extractParams(routePath, actualPath) {
-    const params = {};
-    const routeParts = routePath.split('/');
-    const actualParts = actualPath.split('/');
-    
-    for (let i = 0; i < routeParts.length; i++) {
-      if (routeParts[i].startsWith(':')) {
-        const paramName = routeParts[i].slice(1);
-        params[paramName] = actualParts[i];
-      }
-    }
-    return params;
-  }
-
-  async handle(request, env, ctx) {
-    const url = new URL(request.url);
-    const match = this.matchRoute(request.method, url.pathname);
-    
-    if (match) {
-      // Add params to request object
-      request.params = match.params;
-      return await match.handler(request, env, ctx);
-    }
-    
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
+    return { employeeId: session.employeeId, valid: true };
+  } catch (error) {
+    console.error("Lỗi kiểm tra phiên:", error);
+    return jsonResponse({ message: "Lỗi kiểm tra phiên!", error: error.message }, 500, allowedOrigin);
   }
 }
 
-// Router instance
-const router = new SimpleRouter();
+// Hàm tạo hoặc cập nhật phiên người dùng
+async function createSession(employeeId, db, allowedOrigin) {
+  const token = crypto.randomUUID();
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + 1); // Phiên hết hạn sau 1 giờ
 
-// CORS headers for all responses
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // Will be set dynamically based on request origin
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Requested-With, Accept, Origin, Cache-Control, X-File-Name, Accept-Language, Accept-Encoding',
-  'Access-Control-Allow-Credentials': 'false', // Set to false to allow wildcard origin
-  'Access-Control-Max-Age': '86400', // 24 hours preflight cache
-  'Access-Control-Expose-Headers': 'X-Total-Count, X-Page-Count',
-  'Vary': 'Origin', // Important for proper CORS handling
-};
+  try {
+    const existingSession = await db
+      .prepare("SELECT * FROM sessions WHERE employeeId = ?")
+      .bind(employeeId)
+      .first();
 
-// Utility functions
-const generateId = () => {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-};
+    const query = existingSession
+      ? "UPDATE sessions SET token = ?, expiresAt = ? WHERE employeeId = ?"
+      : "INSERT INTO sessions (employeeId, token, expiresAt) VALUES (?, ?, ?)";
+    const params = existingSession
+      ? [token, expiresAt.toISOString(), employeeId]
+      : [employeeId, token, expiresAt.toISOString()];
 
-const generateSlug = (title) => {
-  if (!title) return '';
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single
-    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-};
+    await db.prepare(query).bind(...params).run();
 
-const hashPassword = async (password) => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-};
+    return jsonResponse({ token, expiresAt: expiresAt.toISOString() }, 200, allowedOrigin);
+  } catch (error) {
+    console.error("Lỗi tạo hoặc cập nhật phiên:", error);
+    return jsonResponse({ message: "Lỗi tạo hoặc cập nhật phiên!", error: error.message }, 500, allowedOrigin);
+  }
+}
 
-const verifyPassword = async (password, hash) => {
-  const hashedInput = await hashPassword(password);
-  return hashedInput === hash;
-};
+// Hàm tính rank dựa trên điểm kinh nghiệm
+function calculateRank(exp) {
+  if (exp >= 5000) return "Kim Cương";
+  if (exp >= 2000) return "Bạch Kim";
+  if (exp >= 1000) return "Vàng";
+  if (exp >= 500) return "Bạc";
+  return "Đồng";
+}
 
-const generateJWT = async (payload, secret) => {
-  const header = {
-    alg: 'HS256',
-    typ: 'JWT'
-  };
+// Hàm đăng ký người dùng (khách hàng)
+async function registerUser(body, db, origin) {
+  const { name, email, password } = body;
+  if (!name || name.trim() === "" || !email || email.trim() === "" || !password || password.trim() === "") {
+    return jsonResponse({ message: "Thiếu thông tin hoặc thông tin không hợp lệ!" }, 400, origin);
+  }
 
-  const encodedHeader = btoa(JSON.stringify(header));
-  const encodedPayload = btoa(JSON.stringify(payload));
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^[0-9]{10,11}$/;
+  if (!emailRegex.test(email) && !phoneRegex.test(email)) {
+    return jsonResponse({ message: "Email hoặc số điện thoại không hợp lệ!" }, 400, origin);
+  }
+
+  if (password.length < 6) {
+    return jsonResponse({ message: "Mật khẩu phải có ít nhất 6 ký tự!" }, 400, origin);
+  }
+
+  const existing = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+  if (existing) return jsonResponse({ message: "Email đã tồn tại!" }, 409, origin);
+
+  const hashedPassword = await hashPassword(password);
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  try {
+    await db
+      .prepare("INSERT INTO users (id, name, email, password, createdAt, exp, rank) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, name, email, hashedPassword, now, 0, "Đồng")
+      .run();
+  } catch (error) {
+    console.error("Lỗi khi tạo người dùng:", error);
+    return jsonResponse({ message: "Lỗi tạo người dùng!", error: error.message }, 500, origin);
+  }
+
+  return await createSession(id, db, origin);
+}
+
+// Hàm đăng nhập người dùng (khách hàng)
+async function loginUser(body, db, origin) {
+  const { email, password } = body;
+  if (!email || email.trim() === "" || !password || password.trim() === "") {
+    return jsonResponse({ message: "Thiếu email hoặc mật khẩu!" }, 400, origin);
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^[0-9]{10,11}$/;
+  if (!emailRegex.test(email) && !phoneRegex.test(email)) {
+    return jsonResponse({ message: "Email hoặc số điện thoại không hợp lệ!" }, 400, origin);
+  }
+
+  const user = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+  if (!user) return jsonResponse({ message: "Tài khoản không tồn tại!" }, 404, origin);
+
+  const hashedPassword = await hashPassword(password);
+  if (user.password !== hashedPassword) {
+    return jsonResponse({ message: "Mật khẩu không đúng!" }, 401, origin);
+  }
+
+  return await createSession(user.id, db, origin);
+}
+
+// Hàm lấy thông tin người dùng (khách hàng)
+async function getUser(url, db, origin) {
+  const token = url.searchParams.get("token");
+  const session = await checkSessionMiddleware(token, db, origin);
+  if (session instanceof Response) return session;
+
+  const user = await db
+    .prepare("SELECT name, email, exp, rank FROM users WHERE id = ?")
+    .bind(session.employeeId)
+    .first();
+
+  if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
+
+  return jsonResponse({ name: user.name, email: user.email, exp: user.exp, rank: user.rank }, 200, origin);
+}
+
+// Hàm cập nhật thông tin người dùng (khách hàng)
+async function updateUser(body, userId, db, origin) {
+  const { name, email, password } = body;
+
+  if (!name && !email && !password) {
+    return jsonResponse({ message: "Không có thông tin nào để cập nhật!" }, 400, origin);
+  }
+
+  const user = await db.prepare("SELECT * FROM users WHERE id = ?").bind(userId).first();
+  if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
+
+  const updates = {};
+  if (name && name.trim() !== "") updates.name = name.trim();
+  if (email && email.trim() !== "") {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^[0-9]{10,11}$/;
+    if (!emailRegex.test(email) && !phoneRegex.test(email)) {
+      return jsonResponse({ message: "Email hoặc số điện thoại không hợp lệ!" }, 400, origin);
+    }
+    const existing = await db.prepare("SELECT * FROM users WHERE email = ? AND id != ?").bind(email, userId).first();
+    if (existing) return jsonResponse({ message: "Email đã tồn tại!" }, 409, origin);
+    updates.email = email.trim();
+  }
+  if (password && password.trim() !== "") {
+    if (password.length < 6) {
+      return jsonResponse({ message: "Mật khẩu phải có ít nhất 6 ký tự!" }, 400, origin);
+    }
+    updates.password = await hashPassword(password);
+  }
+
+  try {
+    const setClause = Object.keys(updates).map(key => `${key} = ?`).join(", ");
+    const values = Object.values(updates).concat(userId);
+    if (setClause) {
+      await db
+        .prepare(`UPDATE users SET ${setClause} WHERE id = ?`)
+        .bind(...values)
+        .run();
+    }
+    return jsonResponse({ message: "Cập nhật thông tin người dùng thành công!" }, 200, origin);
+  } catch (error) {
+    console.error("Lỗi cập nhật thông tin người dùng:", error);
+    return jsonResponse({ message: "Lỗi cập nhật thông tin!", error: error.message }, 500, origin);
+  }
+}
+
+// Hàm điều chỉnh điểm kinh nghiệm người dùng (dành cho admin)
+async function adjustUserExp(body, db, origin) {
+  const { userId, expChange } = body;
+
+  if (!userId || typeof expChange !== "number") {
+    return jsonResponse({ message: "Thiếu userId hoặc expChange không hợp lệ!" }, 400, origin);
+  }
+
+  const user = await db.prepare("SELECT exp FROM users WHERE id = ?").bind(userId).first();
+  if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
+
+  const newExp = Math.max(0, (user.exp || 0) + expChange); // Đảm bảo điểm không âm
+  const newRank = calculateRank(newExp);
+
+  try {
+    await db
+      .prepare("UPDATE users SET exp = ?, rank = ? WHERE id = ?")
+      .bind(newExp, newRank, userId)
+      .run();
+    return jsonResponse({ success: true, newExp, newRank }, 200, origin);
+  } catch (error) {
+    console.error("Lỗi điều chỉnh điểm:", error);
+    return jsonResponse({ message: "Lỗi điều chỉnh điểm!", error: error.message }, 500, origin);
+  }
+}
+
+// Hàm lưu đơn hàng (cập nhật để thêm thông tin giao hàng)
+async function saveOrder(body, userId, db, origin) {
+  const { cart, status, total, deliveryAddress, distance, duration } = body;
   
-  const signature = await crypto.subtle.sign(
-    'HMAC',
-    await crypto.subtle.importKey(
-      'raw',
-      new TextEncoder().encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    ),
-    new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
+  if (!Array.isArray(cart) || cart.length === 0 || !status || typeof total !== "number") {
+    return jsonResponse({ message: "Dữ liệu đơn hàng không hợp lệ!" }, 400, origin);
+  }
+
+  // Kiểm tra dữ liệu cart chi tiết
+  for (const item of cart) {
+    if (!item.name || typeof item.price !== "number" || typeof item.quantity !== "number") {
+      return jsonResponse({ message: "Dữ liệu sản phẩm trong giỏ hàng không hợp lệ!" }, 400, origin);
+    }
+  }
+
+  const user = await db.prepare("SELECT id FROM users WHERE id = ?").bind(userId).first();
+  if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
+
+  const orderId = `ORDER_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const now = new Date().toISOString();
+
+  try {
+    await db
+      .prepare("INSERT INTO orders (orderId, userId, cart, status, total, createdAt, deliveryAddress, distance, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(orderId, userId, JSON.stringify(cart), status, total, now, deliveryAddress || null, distance || null, duration || null)
+      .run();
+  } catch (error) {
+    console.error("Lỗi khi lưu đơn hàng:", error);
+    return jsonResponse({ message: "Lỗi lưu đơn hàng!", error: error.message }, 500, origin);
+  }
+
+  return jsonResponse({ orderId }, 200, origin);
+}
+
+// Hàm hủy đơn hàng
+async function cancelOrder(url, db, origin) {
+  const token = url.searchParams.get("token");
+  const orderId = url.searchParams.get("orderId");
+
+  if (!orderId) return jsonResponse({ message: "Thiếu orderId!" }, 400, origin);
+
+  const session = await checkSessionMiddleware(token, db, origin);
+  if (session instanceof Response) return session;
+
+  const order = await db.prepare("SELECT * FROM orders WHERE orderId = ? AND userId = ?").bind(orderId, session.employeeId).first();
+  if (!order) return jsonResponse({ message: "Đơn hàng không tồn tại hoặc không thuộc về bạn!" }, 404, origin);
+
+  if (order.status !== "pending") {
+    return jsonResponse({ message: "Chỉ có thể hủy đơn hàng ở trạng thái 'pending'!" }, 400, origin);
+  }
+
+  try {
+    await db.prepare("UPDATE orders SET status = 'canceled' WHERE orderId = ?").bind(orderId).run();
+    return jsonResponse({ success: true, message: "Đơn hàng đã được hủy!" }, 200, origin);
+  } catch (error) {
+    console.error("Lỗi hủy đơn hàng:", error);
+    return jsonResponse({ message: "Lỗi hủy đơn hàng!", error: error.message }, 500, origin);
+  }
+}
+
+// Hàm lấy chi tiết đơn hàng theo ID
+async function getOrderById(url, db, origin) {
+  const token = url.searchParams.get("token");
+  const orderId = url.searchParams.get("orderId");
+
+  if (!orderId) return jsonResponse({ message: "Thiếu orderId!" }, 400, origin);
+
+  const session = await checkSessionMiddleware(token, db, origin);
+  if (session instanceof Response) return session;
+
+  const order = await db.prepare("SELECT * FROM orders WHERE orderId = ? AND userId = ?").bind(orderId, session.employeeId).first();
+  if (!order) return jsonResponse({ message: "Đơn hàng không tồn tại hoặc không thuộc về bạn!" }, 404, origin);
+
+  return jsonResponse({
+    orderId: order.orderId,
+    cart: JSON.parse(order.cart),
+    status: order.status,
+    total: Number(order.total),
+    createdAt: order.createdAt,
+    deliveryAddress: order.deliveryAddress,
+    distance: order.distance,
+    duration: order.duration
+  }, 200, origin);
+}
+
+// Hàm cập nhật trạng thái đơn hàng và tính điểm
+async function updateOrderStatus(url, db, origin) {
+  const token = url.searchParams.get("token");
+  const orderId = url.searchParams.get("orderId");
+  const status = url.searchParams.get("status");
+
+  if (!orderId || !status) return jsonResponse({ message: "Thiếu orderId hoặc status!" }, 400, origin);
+  if (!["pending", "success", "canceled"].includes(status)) {
+    return jsonResponse({ message: "Trạng thái không hợp lệ!" }, 400, origin);
+  }
+
+  const session = await checkSessionMiddleware(token, db, origin);
+  if (session instanceof Response) return session;
+
+  const order = await db.prepare("SELECT * FROM orders WHERE orderId = ? AND userId = ?").bind(orderId, session.employeeId).first();
+  if (!order) return jsonResponse({ message: "Đơn hàng không tồn tại hoặc không thuộc về bạn!" }, 404, origin);
+
+  await db.prepare("UPDATE orders SET status = ? WHERE orderId = ?").bind(status, orderId).run();
+
+  if (status === "success") {
+    const total = Number(order.total);
+    const expGain = Math.floor(total / 1000);
+    const user = await db.prepare("SELECT exp FROM users WHERE id = ?").bind(session.employeeId).first();
+    if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
+
+    const newExp = (user.exp || 0) + expGain;
+    const newRank = calculateRank(newExp);
+
+    await db
+      .prepare("UPDATE users SET exp = ?, rank = ? WHERE id = ?")
+      .bind(newExp, newRank, session.employeeId)
+      .run();
+
+    return jsonResponse({ success: true, gainedExp: expGain, newExp, newRank }, 200, origin);
+  }
+
+  return jsonResponse({ success: true }, 200, origin);
+}
+
+// Hàm lấy danh sách đơn hàng
+async function getOrders(url, db, origin) {
+  const token = url.searchParams.get("token");
+  const session = await checkSessionMiddleware(token, db, origin);
+  if (session instanceof Response) return session;
+
+  const orders = await db
+    .prepare("SELECT * FROM orders WHERE userId = ? ORDER BY createdAt DESC")
+    .bind(session.employeeId)
+    .all();
+
+  const result = orders.results.map(order => ({
+    orderId: order.orderId,
+    cart: JSON.parse(order.cart),
+    status: order.status,
+    total: Number(order.total),
+    createdAt: order.createdAt,
+    deliveryAddress: order.deliveryAddress,
+    distance: order.distance,
+    duration: order.duration
+  }));
+
+  return jsonResponse({ orders: result }, 200, origin);
+}
+
+// Hàm lấy danh sách cửa hàng
+async function handleGetStores(db, origin) {
+  const stores = await db.prepare("SELECT storeId, storeName FROM stores").all();
+  if (!stores.results || stores.results.length === 0) {
+    return jsonResponse({ message: "Không tìm thấy cửa hàng nào!" }, 404, origin);
+  }
+  return jsonResponse(stores.results, 200, origin);
+}
+
+// Hàm lấy danh sách nhân viên
+async function handleGetUsers(url, db, origin) {
+  const users = await db
+    .prepare("SELECT employeeId, fullName, storeName, position FROM employees")
+    .all();
+
+  if (!users.results || users.results.length === 0) {
+    return jsonResponse({ message: "Không tìm thấy người dùng!" }, 404, origin);
+  }
+  return jsonResponse(users.results, 200, origin);
+}
+
+// Hàm kiểm tra ID nhân viên
+async function handleCheckId(url, db, origin) {
+  const employeeId = url.searchParams.get("employeeId");
+  if (!employeeId) return jsonResponse({ message: "Thiếu mã nhân viên!" }, 400, origin);
+
+  const user = await db
+    .prepare("SELECT employeeId FROM employees WHERE employeeId = ?")
+    .bind(employeeId)
+    .first();
+
+  return user
+    ? jsonResponse({ message: "Tài Khoản Đã Tồn Tại!" }, 400, origin)
+    : jsonResponse({ message: "Tài Khoản Hợp Lệ!" }, 200, origin);
+}
+
+// Hàm lấy giao dịch
+async function handleGetTransaction(url, db, origin) {
+  const startDate = url.searchParams.get("startDate");
+  if (!startDate) return jsonResponse({ message: "Thiếu startDate!" }, 400, origin);
+
+  try {
+    const transactions = await db
+      .prepare("SELECT id, amount, status FROM 'transaction' WHERE date = ?")
+      .bind(startDate)
+      .all();
+
+    if (transactions.results.length === 0) {
+      return jsonResponse({ message: "Không tìm thấy giao dịch trong ngày này" }, 404, origin);
+    }
+    return jsonResponse(transactions.results, 200, origin);
+  } catch (error) {
+    console.error("Lỗi khi lấy giao dịch:", error);
+    return jsonResponse({ message: "Lỗi server", error: error.message }, 500, origin);
+  }
+}
+
+// Hàm kiểm tra trạng thái giao dịch
+async function checkTransactionStatus(transactionId, db) {
+  if (!transactionId) {
+    console.error("Thiếu transactionId!");
+    return { success: false, message: "Thiếu transactionId!" };
+  }
+
+  const payment = await db
+    .prepare('SELECT extractedID, "transaction", dateTime, description FROM payment WHERE extractedID = ?')
+    .bind(transactionId)
+    .first();
+
+  if (!payment) {
+    console.log(`Không tìm thấy giao dịch với extractedID: ${transactionId}`);
+    return { success: false, message: "Giao dịch không tồn tại!" };
+  }
+
+  return {
+    success: true,
+    id: payment.extractedID,
+    amount: payment.transaction,
+    dateTime: payment.dateTime,
+    description: payment.description,
+  };
+}
+
+// Hàm lưu thanh toán
+async function handleSavePayment(body, db, origin) {
+  const { emails } = body;
+  if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    return jsonResponse({ message: "Dữ liệu không hợp lệ!" }, 400, origin);
+  }
+
+  const stmt = db.prepare(
+    'INSERT INTO payment ("transaction", accountNumber, dateTime, description, extractedID) VALUES (?, ?, ?, ?, ?)'
   );
-  
-  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)));
-  return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
-};
+  const inserts = emails.map(email =>
+    stmt.bind(email.transaction, email.accountNumber, email.dateTime, email.description, email.extractedID)
+  );
 
-const verifyJWT = async (token, secret) => {
+  await db.batch(inserts);
+  return jsonResponse({ message: "Dữ liệu đã được lưu thành công!" }, 200, origin);
+}
+
+// Hàm lưu giao dịch
+async function handleSaveTransaction(body, db, origin) {
+  const { id, amount, status, date } = body;
+  if (!id || !amount || !status || !date) {
+    return jsonResponse({ message: "Thiếu thông tin giao dịch!" }, 400, origin);
+  }
+
+  if (status !== "success" && status !== "failed") {
+    return jsonResponse({ message: "Trạng thái không hợp lệ!" }, 400, origin);
+  }
+
   try {
-    const [encodedHeader, encodedPayload, encodedSignature] = token.split('.');
-    
-    const signature = await crypto.subtle.sign(
-      'HMAC',
-      await crypto.subtle.importKey(
-        'raw',
-        new TextEncoder().encode(secret),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-      ),
-      new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
-    );
-    
-    const expectedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)));
-    
-    if (encodedSignature !== expectedSignature) {
-      return null;
-    }
-    
-    return JSON.parse(atob(encodedPayload));
+    await db
+      .prepare("INSERT INTO 'transaction' (id, amount, status, date) VALUES (?, ?, ?, ?)")
+      .bind(id, amount, status, date)
+      .run();
+    return jsonResponse({ message: "Giao dịch đã được lưu thành công!" }, 200, origin);
   } catch (error) {
-    return null;
+    console.error("Lỗi khi lưu giao dịch:", error);
+    return jsonResponse({ message: "Lỗi lưu giao dịch!", error: error.message }, 500, origin);
   }
-};
+}
 
-const createSlug = (title) => {
-  return title
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/đ/g, 'd')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim('-');
-};
+// Hàm kiểm tra lịch làm việc
+async function handleCheckSchedule(url, db, origin) {
+  const employeeId = url.searchParams.get("employeeId");
+  if (!employeeId) return jsonResponse({ message: "Mã nhân viên không hợp lệ!" }, 400, origin);
 
-const logAudit = async (env, actorId, action, targetType, targetId, metadata = {}, ip = '', ua = '') => {
+  const result = await db
+    .prepare("SELECT createdAt, T2, T3, T4, T5, T6, T7, CN FROM workSchedules WHERE employeeId = ?")
+    .bind(employeeId)
+    .first();
+
+  if (!result) {
+    return jsonResponse({ message: "Nhân viên chưa đăng ký lịch làm!" }, 202, origin);
+  }
+
+  const shifts = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(day => ({
+    day,
+    time: result[day] || "Off",
+  }));
+
+  return jsonResponse({ shifts, message: "Nhân viên đã đăng ký lịch làm!" }, 200, origin);
+}
+
+// Hàm lưu lịch làm việc
+async function handleSaveSchedule(body, db, origin) {
+  const { employeeId, shifts } = body;
+  if (!employeeId || !shifts || !Array.isArray(shifts) || shifts.length === 0) {
+    return jsonResponse({ message: "Dữ liệu không hợp lệ!" }, 401, origin);
+  }
+
+  const employee = await db
+    .prepare("SELECT employeeId, fullName, storeName FROM employees WHERE employeeId = ?")
+    .bind(employeeId)
+    .first();
+
+  if (!employee) return jsonResponse({ message: "Mã nhân viên không tồn tại!" }, 404, origin);
+
+  const scheduleData = { T2: null, T3: null, T4: null, T5: null, T6: null, T7: null, CN: null };
+  for (const shift of shifts) {
+    const { day, start, end } = shift;
+    if (end - start < 4) return jsonResponse({ message: `Ca làm tối thiểu 4h ${day}!` }, 402, origin);
+
+    const dayColumn = { T2: "T2", T3: "T3", T4: "T4", T5: "T5", T6: "T6", T7: "T7", CN: "CN" }[day];
+    if (!dayColumn) return jsonResponse({ message: `Ngày ${day} không hợp lệ!` }, 403, origin);
+
+    scheduleData[dayColumn] = `${String(start).padStart(2, "0")}:00-${String(end).padStart(2, "0")}:00`;
+  }
+
   try {
-    await env.PET_DB.prepare(`
-      INSERT INTO audit_logs (id, actorId, action, targetType, targetId, metadata, ip, ua)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      generateId(),
-      actorId,
-      action,
-      targetType,
-      targetId,
-      JSON.stringify(metadata),
-      ip,
-      ua
-    ).run();
+    await db
+      .prepare(
+        "INSERT INTO workSchedules (employeeId, fullName, storeName, T2, T3, T4, T5, T6, T7, CN) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(
+        employeeId,
+        employee.fullName,
+        employee.storeName,
+        scheduleData.T2,
+        scheduleData.T3,
+        scheduleData.T4,
+        scheduleData.T5,
+        scheduleData.T6,
+        scheduleData.T7,
+        scheduleData.CN
+      )
+      .run();
+    return jsonResponse({ message: "Lịch làm việc đã được lưu thành công!" }, 200, origin);
   } catch (error) {
-    console.error('Failed to log audit:', error);
+    console.error("Lỗi lưu lịch làm việc:", error);
+    return jsonResponse({ message: "Lỗi lưu lịch làm việc!", error: error.message }, 500, origin);
   }
-};
+}
 
-const trackAnalytics = async (env, sessionId, userId, event, properties = {}, ip = '', ua = '', referer = '') => {
+// Hàm đăng nhập nhân viên
+async function handleLogin(body, db, origin) {
+  const { loginEmployeeId: employeeId, loginPassword: password } = body;
+  if (!employeeId || !password) {
+    return jsonResponse({ message: "Thiếu mã nhân viên hoặc mật khẩu!" }, 400, origin);
+  }
+
+  const user = await db
+    .prepare("SELECT password, salt FROM employees WHERE employeeId = ?")
+    .bind(employeeId)
+    .first();
+
+  if (!user) return jsonResponse({ message: "Mã nhân viên không tồn tại!" }, 404, origin);
+
+  const storedHash = Uint8Array.from(user.password.split(",").map(Number));
+  const storedSalt = Uint8Array.from(user.salt.split(",").map(Number));
+  const isPasswordCorrect = await verifyPassword(storedHash, storedSalt, password);
+
+  if (!isPasswordCorrect) return jsonResponse({ message: "Mật khẩu không chính xác!" }, 401, origin);
+
+  const session = await createSession(employeeId, db, origin);
+  if (session instanceof Response && session.status === 200) {
+    const token = await db
+      .prepare("SELECT * FROM sessions WHERE employeeId = ?")
+      .bind(employeeId)
+      .first();
+    return jsonResponse(token, 200, origin);
+  }
+  return jsonResponse({ message: "Lỗi tạo phiên làm việc!" }, 500, origin);
+}
+
+// Hàm lấy tin nhắn
+async function handleGetChat(url, db, origin) {
+  const limit = 50;
+  const lastId = parseInt(url.searchParams.get("lastId"));
+
+  const query = lastId
+    ? "SELECT * FROM messages WHERE id > ? ORDER BY id ASC LIMIT ?"
+    : "SELECT * FROM messages ORDER BY id DESC LIMIT ?";
+  const params = lastId ? [lastId, limit] : [limit];
+
+  const messages = await db.prepare(query).bind(...params).all();
+  if (!messages.results || messages.results.length === 0) {
+    return jsonResponse({ message: "Không có tin nhắn nào!" }, 200, origin);
+  }
+
+  const sortedMessages = lastId ? messages.results : messages.results.reverse();
+  return jsonResponse(sortedMessages, 200, origin);
+}
+
+// Hàm lưu tin nhắn
+async function handleSaveChat(body, db, origin) {
+  const { employeeId, fullName, position, message } = body;
+  if (!employeeId || !fullName || !message) {
+    return jsonResponse({ message: "Thiếu dữ liệu cần thiết!" }, 400, origin);
+  }
+
+  const vietnamTime = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const formattedTime = vietnamTime.toISOString().replace(/T/, " ").replace(/\..+/, "");
+
   try {
-    await env.PET_DB.prepare(`
-      INSERT INTO analytics_events (id, sessionId, userId, event, properties, ip, ua, referer)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      generateId(),
-      sessionId,
-      userId,
-      event,
-      JSON.stringify(properties),
-      ip,
-      ua,
-      referer
-    ).run();
+    await db
+      .prepare("INSERT INTO messages (employeeId, fullName, position, message, time) VALUES (?, ?, ?, ?, ?)")
+      .bind(employeeId, fullName, position, message, formattedTime)
+      .run();
+    return jsonResponse({ message: "Gửi tin nhắn thành công!" }, 200, origin);
   } catch (error) {
-    console.error('Failed to track analytics:', error);
+    console.error("Lỗi lưu tin nhắn:", error);
+    return jsonResponse({ message: "Lỗi lưu tin nhắn!", error: error.message }, 500, origin);
   }
-};
+}
 
-// Authentication middleware
-const requireAuth = async (request, env) => {
-  const authHeader = request.headers.get('Authorization');
-  const token = authHeader?.replace('Bearer ', '') || 
-                request.headers.get('X-Auth-Token') ||
-                getCookieValue(request.headers.get('Cookie'), 'auth_token');
+// Hàm lấy thông tin nhân viên
+async function handleGetUser(url, db, origin) {
+  const employeeId = url.searchParams.get("employeeId");
+  if (!employeeId) return jsonResponse({ message: "Thiếu mã nhân viên!" }, 400, origin);
 
-  if (!token) {
-    return { error: 'Authentication required', status: 401 };
-  }
+  const user = await db
+    .prepare(
+      "SELECT employeeId, fullName, storeName, position, joinDate, phone, email FROM employees WHERE employeeId = ?"
+    )
+    .bind(employeeId)
+    .first();
 
-  const payload = await verifyJWT(token, env.JWT_SECRET);
-  if (!payload) {
-    return { error: 'Invalid token', status: 401 };
-  }
+  if (!user) return jsonResponse({ message: "Không tìm thấy dữ liệu!" }, 404, origin);
+  return jsonResponse(user, 200, origin);
+}
 
-  // Check if session exists and is not expired
-  const session = await env.PET_DB.prepare(`
-    SELECT * FROM sessions 
-    WHERE token = ? AND expiresAt > datetime('now')
-  `).bind(token).first();
-
-  if (!session) {
-    return { error: 'Session expired', status: 401 };
+// Hàm đăng ký nhân viên
+async function handleRegister(body, db, origin) {
+  const { employeeId, fullName, storeName, password, phone, email, position, joinDate, pstatus } = body;
+  if (!employeeId || !fullName || !storeName || !password) {
+    return jsonResponse({ message: "Dữ liệu không hợp lệ!" }, 400, origin);
   }
 
-  // Get user data
-  const user = await env.PET_DB.prepare(`
-    SELECT id, fullName, email, phone, role, status, avatarUrl, canSell, balance
-    FROM users WHERE id = ? AND status = 'active'
-  `).bind(session.userId).first();
+  const existingUser = await db
+    .prepare("SELECT employeeId FROM employees WHERE employeeId = ?")
+    .bind(employeeId)
+    .first();
+  if (existingUser) return jsonResponse({ message: "Mã nhân viên đã tồn tại!" }, 209, origin);
 
-  if (!user) {
-    return { error: 'User not found or inactive', status: 401 };
+  const existingPhone = await db
+    .prepare("SELECT employeeId FROM employees WHERE phone = ?")
+    .bind(phone)
+    .first();
+  if (existingPhone) return jsonResponse({ message: "Số điện thoại đã tồn tại!" }, 210, origin);
+
+  const existingEmail = await db
+    .prepare("SELECT employeeId FROM employees WHERE email = ?")
+    .bind(email)
+    .first();
+  if (existingEmail) return jsonResponse({ message: "Email đã tồn tại!" }, 211, origin);
+
+  const { hash, salt } = await hashPasswordPBKDF2(password);
+  await db
+    .prepare(
+      "INSERT INTO queue (employeeId, password, salt, fullName, storeName, position, joinDate, phone, email, createdAt, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)"
+    )
+    .bind(
+      employeeId,
+      Array.from(hash).join(","),
+      Array.from(salt).join(","),
+      fullName,
+      storeName,
+      position || "NV",
+      joinDate || null,
+      phone || null,
+      email || null,
+      pstatus || "Wait"
+    )
+    .run();
+
+  return jsonResponse({ message: "Yêu cầu của bạn đã được gửi" }, 200, origin);
+}
+
+// Hàm cập nhật thông tin nhân viên
+async function handleUpdate(body, db, origin) {
+  const { employeeId, fullName, storeName, position, phone, email, joinDate } = body;
+  if (!employeeId || !fullName || !storeName) {
+    return jsonResponse({ message: "Dữ liệu không hợp lệ!" }, 400, origin);
   }
 
-  return { user, session };
-};
+  const updated = await db
+    .prepare(
+      "UPDATE employees SET fullName = ?, storeName = ?, position = ?, phone = ?, email = ?, joinDate = ? WHERE employeeId = ?"
+    )
+    .bind(fullName, storeName, position || "NV", phone || null, email || null, joinDate || null, employeeId)
+    .run();
 
-const requireRole = (roles) => {
-  return async (request, env) => {
-    const authResult = await requireAuth(request, env);
-    if (authResult.error) return authResult;
-
-    const { user } = authResult;
-    if (!roles.includes(user.role)) {
-      return { error: 'Insufficient permissions', status: 403 };
-    }
-
-    return authResult;
-  };
-};
-
-const getCookieValue = (cookieHeader, name) => {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? match[2] : null;
-};
-
-// Rate limiting middleware
-const rateLimit = async (env, key, limit = 100, window = 3600) => {
-  try {
-    const count = await env.RATELIMIT_KV.get(key);
-    const currentCount = count ? parseInt(count) : 0;
-    
-    if (currentCount >= limit) {
-      return { error: 'Rate limit exceeded', status: 429 };
-    }
-    
-    await env.RATELIMIT_KV.put(key, (currentCount + 1).toString(), { expirationTtl: window });
-    return { success: true };
-  } catch (error) {
-    console.error('Rate limiting error:', error);
-    return { success: true }; // Fail open
+  if (updated.meta.changes === 0) {
+    return jsonResponse({ message: "Cập nhật thất bại, mã nhân viên không tồn tại!" }, 404, origin);
   }
-};
+  return jsonResponse({ message: "Cập nhật thành công!" }, 200, origin);
+}
 
-// Helper function to set CORS headers dynamically
-const setCorsHeaders = (request, env) => {
-  const origin = request.headers.get('Origin');
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:8080', 
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:8080',
-    'https://hipet-market.pages.dev',
-    'https://petmarket.tocotoco.workers.dev',
-    'https://zewk3.github.io', // Add GitHub Pages origin
-    env.ALLOWED_ORIGIN
-  ].filter(Boolean);
+// Hàm mã hóa mật khẩu (dành cho nhân viên) sử dụng PBKDF2
+async function hashPasswordPBKDF2(password, salt = crypto.getRandomValues(new Uint8Array(16))) {
+  const encoder = new TextEncoder();
+  const passwordBuffer = encoder.encode(password);
 
-  const headers = { ...corsHeaders };
-  
-  // Set specific origin if it's in allowed list, otherwise use wildcard
-  if (origin && allowedOrigins.includes(origin)) {
-    headers['Access-Control-Allow-Origin'] = origin;
-    headers['Access-Control-Allow-Credentials'] = 'true';
-  } else {
-    headers['Access-Control-Allow-Origin'] = '*';
-    headers['Access-Control-Allow-Credentials'] = 'false';
-  }
-  
-  return headers;
-};
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    passwordBuffer,
+    "PBKDF2",
+    false,
+    ["deriveBits", "deriveKey"]
+  );
 
-// CORS preflight handler with enhanced headers
-router.options('*', (request, env) => {
-  try {
-    const dynamicCorsHeaders = setCorsHeaders(request, env);
-    return new Response(null, {
-      status: 200, // HTTP 200 required for successful preflight
-      headers: {
-        ...dynamicCorsHeaders,
-        'Content-Length': '0'
+  const hashBuffer = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    keyMaterial,
+    256
+  );
+
+  return { hash: new Uint8Array(hashBuffer), salt };
+}
+
+// Hàm xác minh mật khẩu (dành cho nhân viên)
+async function verifyPassword(storedHash, storedSalt, password) {
+  const { hash } = await hashPasswordPBKDF2(password, storedSalt);
+  return storedHash.length === hash.length && storedHash.every((byte, index) => byte === hash[index]);
+}
+
+export default {
+  async scheduled(event, env, ctx) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (today.getDay() !== 1) {
+        console.log(`Today is ${today.toLocaleDateString("en-US", { weekday: "long" })}. No action required.`);
+        return;
       }
-    });
-  } catch (error) {
-    console.error('CORS preflight error:', error);
-    return new Response(null, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Length': '0'
+
+      console.log("It's Monday! Clearing workSchedules...");
+      const deleteResult = await env.D1_BINDING.prepare("DELETE FROM workSchedules").run();
+      console.log(`Deleted ${deleteResult.meta.changes} rows from workSchedules.`);
+    } catch (error) {
+      console.error("Error in scheduled worker:", error);
+    }
+  },
+
+  async fetch(request, env) {
+    const db = env.D1_BINDING;
+    if (request.method === "OPTIONS") return handleOptionsRequest();
+
+    try {
+      const url = new URL(request.url);
+      const action = url.searchParams.get("action");
+      let token = url.searchParams.get("token");
+
+      // Kiểm tra token từ header Authorization nếu không có trong query
+      const authHeader = request.headers.get("Authorization");
+      if (!token && authHeader && authHeader.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
       }
-    });
-  }
-});
 
-// Health check
-router.get('/api/health', () => {
-  return new Response(JSON.stringify({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString() 
-  }), {
-    headers: { 'Content-Type': 'application/json', ...corsHeaders }
-  });
-});
+      if (!action) return jsonResponse({ message: "Thiếu action trong query parameters!" }, 400);
 
-// Development seed endpoint
-router.post('/api/dev/seed', async (request, env) => {
-  if (env.DEV !== 'true') {
-    return new Response(JSON.stringify({ error: 'Not available in production' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    // Run seed data
-    const seedSQL = `
-      -- Insert demo users with proper password hashes
-      INSERT OR IGNORE INTO users (id, fullName, email, phone, passwordHash, role, status, avatarUrl) VALUES
-      ('demo_buyer_001', 'Nguyễn Văn Hùng', 'buyer@demo.com', '0901234567', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'buyer', 'active', 'https://via.placeholder.com/150/0066CC/FFFFFF?text=BU'),
-      ('demo_seller_001', 'Trần Thị Linh', 'seller@demo.com', '0912345678', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'seller', 'active', 'https://via.placeholder.com/150/009966/FFFFFF?text=SE'),
-      ('demo_admin_001', 'Lê Văn Quản', 'admin@demo.com', '0923456789', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'admin', 'active', 'https://via.placeholder.com/150/CC0000/FFFFFF?text=AD'),
-      ('demo_support_001', 'Phạm Thị Hỗ Trợ', 'support@demo.com', '0934567890', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'support', 'active', 'https://via.placeholder.com/150/FF6600/FFFFFF?text=SU');
-    `;
-    
-    await env.PET_DB.exec(seedSQL);
-    
-    return new Response(JSON.stringify({ 
-      message: 'Database seeded successfully',
-      accounts: [
-        { email: 'buyer@demo.com', password: 'demo123', role: 'buyer' },
-        { email: 'seller@demo.com', password: 'demo123', role: 'seller' },
-        { email: 'admin@demo.com', password: 'demo123', role: 'admin' },
-        { email: 'support@demo.com', password: 'demo123', role: 'support' }
-      ]
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Authentication endpoints
-router.post('/api/auth/register', async (request, env) => {
-  try {
-    const { fullName, email, phone, password } = await request.json();
-    
-    // Validation
-    if (!fullName || !email || !password) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Check if email exists
-    const existingUser = await env.PET_DB.prepare(`
-      SELECT id FROM users WHERE email = ?
-    `).bind(email).first();
-
-    if (existingUser) {
-      return new Response(JSON.stringify({ error: 'Email already registered' }), {
-        status: 409,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Hash password
-    const passwordHash = await hashPassword(password);
-    const userId = generateId();
-    const role = 'user'; // Default unified user role
-    const canSell = 0; // Default: cannot sell initially
-    const balance = 1000; // Default balance: $10.00 (in cents)
-
-    // Create user
-    await env.PET_DB.prepare(`
-      INSERT INTO users (id, fullName, email, phone, passwordHash, role, status, canSell, balance)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(userId, fullName, email, phone || null, passwordHash, role, 'active', canSell.toString(), balance.toString()).run();
-
-    // Create session
-    const sessionId = generateId();
-    const token = await generateJWT({ userId, sessionId }, env.JWT_SECRET);
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
-
-    await env.PET_DB.prepare(`
-      INSERT INTO sessions (id, userId, token, ip, ua, expiresAt)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(sessionId, userId, token, request.headers.get('CF-Connecting-IP') || '', request.headers.get('User-Agent') || '', expiresAt).run();
-
-    // Get user data
-    const user = await env.PET_DB.prepare(`
-      SELECT id, fullName, email, phone, role, status, avatarUrl, canSell, balance, createdAt
-      FROM users WHERE id = ?
-    `).bind(userId).first();
-
-    // Track analytics
-    await trackAnalytics(env, sessionId, userId, 'user_registered', { role }, request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
-
-    return new Response(JSON.stringify({ 
-      user, 
-      token,
-      message: 'Registration successful'
-    }), {
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Set-Cookie': `auth_token=${token}; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000; Path=/`,
-        ...corsHeaders 
+      const protectedActions = [
+        "update", "savedk", "checkdk", "getUser", "getUsers", 
+        "saveOrder", "updateOrderStatus", "getOrders", "cancelOrder", 
+        "getOrderById", "updateUser", "adjustUserExp"
+      ];
+      if (protectedActions.includes(action)) {
+        const session = await checkSessionMiddleware(token, db, ALLOWED_ORIGIN);
+        if (session instanceof Response) return session;
+        request.userId = session.employeeId;
       }
-    });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-router.post('/api/auth/login', async (request, env) => {
-  try {
-    const { email, password } = await request.json();
-    
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: 'Email and password required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Find user
-    const user = await env.PET_DB.prepare(`
-      SELECT id, fullName, email, phone, passwordHash, role, status, avatarUrl, canSell, balance, createdAt
-      FROM users WHERE email = ? AND status = 'active'
-    `).bind(email).first();
-
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Verify password
-    const isValidPassword = await verifyPassword(password, user.passwordHash);
-    if (!isValidPassword) {
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Create session
-    const sessionId = generateId();
-    const token = await generateJWT({ userId: user.id, sessionId }, env.JWT_SECRET);
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
-
-    await env.PET_DB.prepare(`
-      INSERT INTO sessions (id, userId, token, ip, ua, expiresAt)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(sessionId, user.id, token, request.headers.get('CF-Connecting-IP') || '', request.headers.get('User-Agent') || '', expiresAt).run();
-
-    // Remove password hash from response
-    delete user.passwordHash;
-
-    // Track analytics
-    await trackAnalytics(env, sessionId, user.id, 'user_login', { role: user.role }, request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
-
-    return new Response(JSON.stringify({ 
-      user, 
-      token,
-      message: 'Login successful'
-    }), {
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Set-Cookie': `auth_token=${token}; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000; Path=/`,
-        ...corsHeaders 
-      }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-router.post('/api/auth/logout', async (request, env) => {
-  try {
-    const authResult = await requireAuth(request, env);
-    if (authResult.error) {
-      return new Response(JSON.stringify(authResult), {
-        status: authResult.status,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const { session } = authResult;
-
-    // Delete session
-    await env.PET_DB.prepare(`
-      DELETE FROM sessions WHERE id = ?
-    `).bind(session.id).run();
-
-    return new Response(JSON.stringify({ message: 'Logout successful' }), {
-      headers: { 
-        'Content-Type': 'application/json',
-        'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/',
-        ...corsHeaders 
-      }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-router.get('/api/auth/me', async (request, env) => {
-  try {
-    const authResult = await requireAuth(request, env);
-    if (authResult.error) {
-      return new Response(JSON.stringify(authResult), {
-        status: authResult.status,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const { user } = authResult;
-    return new Response(JSON.stringify({ user }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// User management endpoints for unified system
-router.post('/api/users/enable-selling', async (request, env) => {
-  try {
-    const authResult = await requireAuth(request, env);
-    if (authResult.error) {
-      return new Response(JSON.stringify(authResult), {
-        status: authResult.status,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const { user } = authResult;
-
-    // Enable selling capability for the user
-    await env.PET_DB.prepare(`
-      UPDATE users SET canSell = 1 WHERE id = ?
-    `).bind(user.id).run();
-
-    // Log audit trail
-    await logAudit(env, user.id, 'user_enabled_selling', 'user', user.id, {}, 
-                   request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
-
-    // Get updated user data
-    const updatedUser = await env.PET_DB.prepare(`
-      SELECT id, fullName, email, phone, role, status, avatarUrl, canSell, balance
-      FROM users WHERE id = ?
-    `).bind(user.id).first();
-
-    return new Response(JSON.stringify({ 
-      user: updatedUser,
-      message: 'Selling capability enabled successfully'
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-router.post('/api/users/topup', async (request, env) => {
-  try {
-    const authResult = await requireAuth(request, env);
-    if (authResult.error) {
-      return new Response(JSON.stringify(authResult), {
-        status: authResult.status,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const { user } = authResult;
-    const { amount, paymentMethod = 'demo' } = await request.json();
-
-    // Validation
-    if (!amount || amount <= 0 || amount > 100000) { // Max $1000
-      return new Response(JSON.stringify({ error: 'Invalid amount' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Convert amount to cents
-    const amountCents = Math.round(amount * 100);
-
-    // Update user balance
-    await env.PET_DB.prepare(`
-      UPDATE users SET balance = balance + ? WHERE id = ?
-    `).bind(amountCents.toString(), user.id).run();
-
-    // Log audit trail
-    await logAudit(env, user.id, 'user_topup', 'user', user.id, 
-                   { amount: amountCents, paymentMethod }, 
-                   request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
-
-    // Track analytics
-    await trackAnalytics(env, user.id, user.id, 'balance_topup', 
-                        { amount: amountCents, paymentMethod }, 
-                        request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
-
-    // Get updated user data
-    const updatedUser = await env.PET_DB.prepare(`
-      SELECT id, fullName, email, phone, role, status, avatarUrl, canSell, balance
-      FROM users WHERE id = ?
-    `).bind(user.id).first();
-
-    return new Response(JSON.stringify({ 
-      user: updatedUser,
-      message: `Successfully topped up $${amount.toFixed(2)}`
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Pet listings endpoints
-router.get('/api/pets', async (request, env) => {
-  try {
-    const url = new URL(request.url);
-    const search = url.searchParams.get('search') || '';
-    const species = url.searchParams.get('species') || '';
-    const province = url.searchParams.get('province') || '';
-    const priceMin = parseInt(url.searchParams.get('priceMin')) || 0;
-    const priceMax = parseInt(url.searchParams.get('priceMax')) || 999999999;
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 100);
-    const offset = (page - 1) * limit;
-
-    let whereConditions = ['status IN (?, ?)'];
-    let params = ['approved', 'sold'];
-
-    if (search) {
-      whereConditions.push('(title LIKE ? OR description LIKE ? OR breed LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
-
-    if (species) {
-      whereConditions.push('species = ?');
-      params.push(species);
-    }
-
-    if (province) {
-      whereConditions.push('locationProvince = ?');
-      params.push(province);
-    }
-
-    if (priceMin > 0) {
-      whereConditions.push('price >= ?');
-      params.push(priceMin.toString());
-    }
-
-    if (priceMax < 999999999) {
-      whereConditions.push('price <= ?');
-      params.push(priceMax.toString());
-    }
-
-    const whereClause = whereConditions.join(' AND ');
-
-    // Get total count
-    const countResult = await env.PET_DB.prepare(`
-      SELECT COUNT(*) as total FROM pets WHERE ${whereClause}
-    `).bind(...params).first();
-
-    // Get pets with seller info
-    const pets = await env.PET_DB.prepare(`
-      SELECT 
-        p.*,
-        u.fullName as sellerName,
-        u.avatarUrl as sellerAvatar,
-        (SELECT AVG(rating) FROM reviews WHERE targetUserId = p.sellerId) as sellerRating,
-        (SELECT COUNT(*) FROM reviews WHERE targetUserId = p.sellerId) as sellerReviewCount
-      FROM pets p
-      JOIN users u ON p.sellerId = u.id
-      WHERE ${whereClause}
-      ORDER BY p.createdAt DESC
-      LIMIT ? OFFSET ?
-    `).bind(...params, limit, offset).all();
-
-    // Parse JSON fields
-    const petsWithParsedData = pets.results.map(pet => ({
-      ...pet,
-      photos: pet.photos ? JSON.parse(pet.photos) : [],
-      sellerRating: pet.sellerRating ? parseFloat(pet.sellerRating.toFixed(1)) : null
-    }));
-
-    return new Response(JSON.stringify({
-      pets: petsWithParsedData,
-      pagination: {
-        page,
-        limit,
-        total: countResult.total,
-        totalPages: Math.ceil(countResult.total / limit)
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-router.get('/api/pets/:slug', async (request, env) => {
-  try {
-    const { slug } = request.params;
-
-    // Get pet with seller info
-    const pet = await env.PET_DB.prepare(`
-      SELECT 
-        p.*,
-        u.fullName as sellerName,
-        u.email as sellerEmail,
-        u.phone as sellerPhone,
-        u.avatarUrl as sellerAvatar,
-        u.createdAt as sellerJoinedAt,
-        (SELECT AVG(rating) FROM reviews WHERE targetUserId = p.sellerId) as sellerRating,
-        (SELECT COUNT(*) FROM reviews WHERE targetUserId = p.sellerId) as sellerReviewCount
-      FROM pets p
-      JOIN users u ON p.sellerId = u.id
-      WHERE p.slug = ? AND p.status IN ('approved', 'sold')
-    `).bind(slug).first();
-
-    if (!pet) {
-      return new Response(JSON.stringify({ error: 'Pet not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Increment view count
-    await env.PET_DB.prepare(`
-      UPDATE pets SET viewCount = viewCount + 1 WHERE id = ?
-    `).bind(pet.id).run();
-
-    // Get pet attributes
-    const attributes = await env.PET_DB.prepare(`
-      SELECT key, value FROM pet_attributes WHERE petId = ?
-    `).bind(pet.id).all();
-
-    // Parse JSON fields
-    const petData = {
-      ...pet,
-      photos: pet.photos ? JSON.parse(pet.photos) : [],
-      attributes: attributes.results.reduce((acc, attr) => {
-        acc[attr.key] = attr.value;
-        return acc;
-      }, {}),
-      sellerRating: pet.sellerRating ? parseFloat(pet.sellerRating.toFixed(1)) : null,
-      viewCount: pet.viewCount + 1
-    };
-
-    // Track analytics
-    const sessionId = generateId();
-    await trackAnalytics(env, sessionId, null, 'pet_viewed', { petId: pet.id, species: pet.species }, request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
-
-    return new Response(JSON.stringify({ pet: petData }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Upload endpoint for R2
-router.post('/api/upload/presign', async (request, env) => {
-  try {
-    const authResult = await requireRole(['seller', 'admin'])(request, env);
-    if (authResult.error) {
-      return new Response(JSON.stringify(authResult), {
-        status: authResult.status,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const { contentType, fileName } = await request.json();
-    
-    if (!contentType || !fileName) {
-      return new Response(JSON.stringify({ error: 'contentType and fileName required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(contentType)) {
-      return new Response(JSON.stringify({ error: 'Invalid file type. Only JPEG, PNG, and WebP allowed.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const key = `pets/${generateId()}-${fileName}`;
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-    // Generate presigned URL for R2
-    const presignedUrl = await env.PET_IMAGES.url(key, {
-      method: 'PUT',
-      expires: Math.floor(expiresAt.getTime() / 1000),
-      headers: {
-        'Content-Type': contentType
-      }
-    });
-
-    const publicUrl = `${env.R2_PUBLIC_BASE}/${key}`;
-
-    return new Response(JSON.stringify({
-      uploadUrl: presignedUrl,
-      publicUrl,
-      key,
-      expiresAt: expiresAt.toISOString()
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// ===== PET MANAGEMENT ENDPOINTS =====
-
-// Create new pet listing
-router.post('/api/pets', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    
-    // Check if user can sell pets
-    if (!user.canSell && user.role !== 'admin') {
-      return new Response(JSON.stringify({ 
-        error: 'You need to enable selling capability first',
-        requiresSellerRegistration: true
-      }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const petData = await request.json();
-    
-    // Validate required fields
-    const required = ['title', 'species', 'breed', 'sex', 'ageMonths', 'price', 'description', 'locationProvince'];
-    for (const field of required) {
-      if (!petData[field]) {
-        return new Response(JSON.stringify({ error: `${field} is required` }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
-      }
-    }
-
-    // Check and deduct posting fee ($0.50 = 50 cents)
-    const postingFee = 50; // 50 cents
-    if (user.balance < postingFee && user.role !== 'admin') {
-      return new Response(JSON.stringify({ 
-        error: 'Insufficient balance for posting fee ($0.50)',
-        currentBalance: user.balance / 100,
-        requiredBalance: postingFee / 100,
-        requiresTopUp: true
-      }), {
-        status: 402, // Payment Required
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const id = generateId();
-    const slug = generateSlug(petData.title);
-    const photos = JSON.stringify(petData.photos || []);
-    const personalityTraits = Array.isArray(petData.personalityTraits) 
-      ? petData.personalityTraits.join(',') 
-      : petData.personalityTraits || '';
-
-    // Start transaction-like operations
-    await env.PET_DB.prepare(`
-      INSERT INTO pets (
-        id, sellerId, title, slug, species, breed, sex, ageMonths, 
-        vaccinated, dewormed, price, description, locationProvince, 
-        photos, status, weight, height, color, personalityTraits
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
-    `).bind(
-      id, user.id, petData.title, slug, petData.species, petData.breed,
-      petData.sex, petData.ageMonths, petData.vaccinated ? 1 : 0,
-      petData.dewormed ? 1 : 0, petData.price, petData.description,
-      petData.locationProvince, photos, petData.weight || null,
-      petData.height || null, petData.color || '', personalityTraits
-    ).run();
-
-    // Deduct posting fee (skip for admin)
-    if (user.role !== 'admin') {
-      await env.PET_DB.prepare(`
-        UPDATE users SET balance = balance - ? WHERE id = ?
-      `).bind(postingFee.toString(), user.id).run();
-
-      // Log posting fee deduction
-      await logAudit(env, user.id, 'posting_fee_deducted', 'user', user.id, 
-                     { amount: postingFee, petId: id }, 
-                     request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
-    }
-
-    // Log audit
-    await logAudit(env, user.id, 'CREATE', 'pet', id, petData);
-
-    // Track analytics
-    await trackAnalytics(env, user.id, user.id, 'pet_listing_created', 
-                        { species: petData.species, price: petData.price }, 
-                        request.headers.get('CF-Connecting-IP'), request.headers.get('User-Agent'));
-
-    return new Response(JSON.stringify({ 
-      success: true, 
-      id, 
-      slug,
-      postingFeeDeducted: user.role !== 'admin' ? postingFee / 100 : 0,
-      message: 'Pet listing created successfully and pending approval' 
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Create pet error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to create pet listing' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Update pet listing
-router.put('/api/pets/:id', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const petId = request.params.id;
-    const petData = await request.json();
-
-    // Check if pet exists and user owns it (or is admin)
-    const pet = await env.PET_DB.prepare(`
-      SELECT * FROM pets WHERE id = ?
-    `).bind(petId).first();
-
-    if (!pet) {
-      return new Response(JSON.stringify({ error: 'Pet not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    if (pet.sellerId !== user.id && user.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Access denied' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const updateFields = [];
-    const updateValues = [];
-
-    // Build dynamic update query
-    const updatableFields = ['title', 'species', 'breed', 'sex', 'ageMonths', 'vaccinated', 'dewormed', 'price', 'description', 'locationProvince', 'weight', 'height', 'color', 'personalityTraits'];
-    
-    for (const field of updatableFields) {
-      if (petData[field] !== undefined) {
-        updateFields.push(`${field} = ?`);
-        if (field === 'vaccinated' || field === 'dewormed') {
-          updateValues.push(petData[field] ? 1 : 0);
-        } else if (field === 'personalityTraits' && Array.isArray(petData[field])) {
-          updateValues.push(petData[field].join(','));
-        } else {
-          updateValues.push(petData[field]);
+      if (request.method === "POST") {
+        const contentType = request.headers.get("Content-Type") || "";
+        if (!contentType.includes("application/json")) {
+          return jsonResponse({ message: "Invalid Content-Type" }, 400);
+        }
+
+        const body = await request.json();
+        switch (action) {
+          case "sendMessage":
+            return await handleSaveChat(body, db, ALLOWED_ORIGIN);
+          case "login":
+            return await handleLogin(body, db, ALLOWED_ORIGIN);
+          case "register":
+            return await handleRegister(body, db, ALLOWED_ORIGIN);
+          case "update":
+            return await handleUpdate(body, db, ALLOWED_ORIGIN);
+          case "savedk":
+            return await handleSaveSchedule(body, db, ALLOWED_ORIGIN);
+          case "saveTransaction":
+            return await handleSaveTransaction(body, db, ALLOWED_ORIGIN);
+          case "savePayment":
+            return await handleSavePayment(body, db, ALLOWED_ORIGIN);
+          case "registerUser":
+            return await registerUser(body, db, ALLOWED_ORIGIN);
+          case "loginUser":
+            return await loginUser(body, db, ALLOWED_ORIGIN);
+          case "saveOrder":
+            return await saveOrder(body, request.userId, db, ALLOWED_ORIGIN);
+          case "updateUser":
+            return await updateUser(body, request.userId, db, ALLOWED_ORIGIN);
+          case "adjustUserExp":
+            return await adjustUserExp(body, db, ALLOWED_ORIGIN);
+          default:
+            return jsonResponse({ message: "Action không hợp lệ!" }, 400);
         }
       }
-    }
 
-    if (petData.photos) {
-      updateFields.push('photos = ?');
-      updateValues.push(JSON.stringify(petData.photos));
-    }
-
-    if (petData.title) {
-      updateFields.push('slug = ?');
-      updateValues.push(generateSlug(petData.title));
-    }
-
-    updateFields.push('updatedAt = ?');
-    updateValues.push(new Date().toISOString());
-
-    updateValues.push(petId);
-
-    if (updateFields.length > 1) { // More than just updatedAt
-      await env.PET_DB.prepare(`
-        UPDATE pets SET ${updateFields.join(', ')} WHERE id = ?
-      `).bind(...updateValues).run();
-
-      // Log audit
-      await logAudit(env, user.id, 'UPDATE', 'pet', petId, petData);
-    }
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      message: 'Pet listing updated successfully' 
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Update pet error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update pet listing' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Delete pet listing
-router.delete('/api/pets/:id', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const petId = request.params.id;
-
-    // Check if pet exists and user owns it (or is admin)
-    const pet = await env.PET_DB.prepare(`
-      SELECT * FROM pets WHERE id = ?
-    `).bind(petId).first();
-
-    if (!pet) {
-      return new Response(JSON.stringify({ error: 'Pet not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    if (pet.sellerId !== user.id && user.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Access denied' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Soft delete (change status to 'deleted')
-    await env.PET_DB.prepare(`
-      UPDATE pets SET status = 'deleted', updatedAt = ? WHERE id = ?
-    `).bind(new Date().toISOString(), petId).run();
-
-    // Log audit
-    await logAudit(env, user.id, 'DELETE', 'pet', petId, { reason: 'User deletion' });
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      message: 'Pet listing deleted successfully' 
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Delete pet error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to delete pet listing' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Get seller's pets
-router.get('/api/seller/pets', async (request, env) => {
-  const authResult = await requireRole(['seller', 'admin'])(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const url = new URL(request.url);
-    const status = url.searchParams.get('status') || 'all';
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
-    const offset = (page - 1) * limit;
-
-    let whereClause = 'WHERE sellerId = ?';
-    let bindings = [user.id];
-
-    if (status !== 'all') {
-      whereClause += ' AND status = ?';
-      bindings.push(status);
-    }
-
-    const pets = await env.PET_DB.prepare(`
-      SELECT p.*, u.fullName as sellerName
-      FROM pets p
-      LEFT JOIN users u ON p.sellerId = u.id
-      ${whereClause}
-      ORDER BY p.createdAt DESC
-      LIMIT ? OFFSET ?
-    `).bind(...bindings, limit, offset).all();
-
-    const countResult = await env.PET_DB.prepare(`
-      SELECT COUNT(*) as total FROM pets ${whereClause}
-    `).bind(...bindings).first();
-
-    return new Response(JSON.stringify({
-      pets: pets.results.map(pet => ({
-        ...pet,
-        photos: JSON.parse(pet.photos || '[]'),
-        personalityTraits: pet.personalityTraits ? pet.personalityTraits.split(',') : []
-      })),
-      pagination: {
-        page,
-        limit,
-        total: countResult.total,
-        totalPages: Math.ceil(countResult.total / limit)
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Get seller pets error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch pets' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// ===== FAVORITES ENDPOINTS =====
-
-// Add to favorites
-router.post('/api/favorites', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const { petId } = await request.json();
-
-    if (!petId) {
-      return new Response(JSON.stringify({ error: 'petId is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Check if pet exists
-    const pet = await env.PET_DB.prepare(`
-      SELECT id FROM pets WHERE id = ? AND status = 'approved'
-    `).bind(petId).first();
-
-    if (!pet) {
-      return new Response(JSON.stringify({ error: 'Pet not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Check if already favorited
-    const existing = await env.PET_DB.prepare(`
-      SELECT id FROM favorites WHERE userId = ? AND petId = ?
-    `).bind(user.id, petId).first();
-
-    if (existing) {
-      return new Response(JSON.stringify({ error: 'Pet already in favorites' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Add to favorites
-    const id = generateId();
-    await env.PET_DB.prepare(`
-      INSERT INTO favorites (id, userId, petId) VALUES (?, ?, ?)
-    `).bind(id, user.id, petId).run();
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      message: 'Added to favorites' 
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Add favorite error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to add to favorites' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Remove from favorites
-router.delete('/api/favorites/:petId', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const petId = request.params.petId;
-
-    await env.PET_DB.prepare(`
-      DELETE FROM favorites WHERE userId = ? AND petId = ?
-    `).bind(user.id, petId).run();
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      message: 'Removed from favorites' 
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Remove favorite error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to remove from favorites' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Get user favorites
-router.get('/api/favorites', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
-    const offset = (page - 1) * limit;
-
-    const favorites = await env.PET_DB.prepare(`
-      SELECT p.*, u.fullName as sellerName, f.createdAt as favoritedAt
-      FROM favorites f
-      JOIN pets p ON f.petId = p.id
-      LEFT JOIN users u ON p.sellerId = u.id
-      WHERE f.userId = ? AND p.status = 'approved'
-      ORDER BY f.createdAt DESC
-      LIMIT ? OFFSET ?
-    `).bind(user.id, limit, offset).all();
-
-    const countResult = await env.PET_DB.prepare(`
-      SELECT COUNT(*) as total 
-      FROM favorites f
-      JOIN pets p ON f.petId = p.id
-      WHERE f.userId = ? AND p.status = 'approved'
-    `).bind(user.id).first();
-
-    return new Response(JSON.stringify({
-      favorites: favorites.results.map(pet => ({
-        ...pet,
-        photos: JSON.parse(pet.photos || '[]'),
-        personalityTraits: pet.personalityTraits ? pet.personalityTraits.split(',') : []
-      })),
-      pagination: {
-        page,
-        limit,
-        total: countResult.total,
-        totalPages: Math.ceil(countResult.total / limit)
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Get favorites error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch favorites' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// ===== CART & ORDERS ENDPOINTS =====
-
-// Add to cart
-router.post('/api/cart', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const { petId, quantity = 1 } = await request.json();
-
-    if (!petId) {
-      return new Response(JSON.stringify({ error: 'petId is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Check if pet exists and is available
-    const pet = await env.PET_DB.prepare(`
-      SELECT id, price FROM pets WHERE id = ? AND status = 'approved'
-    `).bind(petId).first();
-
-    if (!pet) {
-      return new Response(JSON.stringify({ error: 'Pet not found or not available' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Get or create cart
-    let cart = await env.PET_DB.prepare(`
-      SELECT id FROM carts WHERE userId = ? AND status = 'active'
-    `).bind(user.id).first();
-
-    if (!cart) {
-      const cartId = generateId();
-      await env.PET_DB.prepare(`
-        INSERT INTO carts (id, userId, status) VALUES (?, ?, 'active')
-      `).bind(cartId, user.id).run();
-      cart = { id: cartId };
-    }
-
-    // Check if item already in cart
-    const existingItem = await env.PET_DB.prepare(`
-      SELECT id, quantity FROM cart_items WHERE cartId = ? AND petId = ?
-    `).bind(cart.id, petId).first();
-
-    if (existingItem) {
-      // Update quantity
-      await env.PET_DB.prepare(`
-        UPDATE cart_items SET quantity = quantity + ? WHERE id = ?
-      `).bind(quantity.toString(), existingItem.id).run();
-    } else {
-      // Add new item
-      const itemId = generateId();
-      await env.PET_DB.prepare(`
-        INSERT INTO cart_items (id, cartId, petId, quantity, price)
-        VALUES (?, ?, ?, ?, ?)
-      `).bind(itemId, cart.id, petId, quantity.toString(), pet.price.toString()).run();
-    }
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      message: 'Added to cart' 
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Add to cart error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to add to cart' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Get cart
-router.get('/api/cart', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-
-    const cartItems = await env.PET_DB.prepare(`
-      SELECT ci.*, p.title, p.photos, p.species, p.breed, u.fullName as sellerName
-      FROM cart_items ci
-      JOIN carts c ON ci.cartId = c.id
-      JOIN pets p ON ci.petId = p.id
-      LEFT JOIN users u ON p.sellerId = u.id
-      WHERE c.userId = ? AND c.status = 'active' AND p.status = 'approved'
-      ORDER BY ci.createdAt DESC
-    `).bind(user.id).all();
-
-    const items = cartItems.results.map(item => ({
-      ...item,
-      photos: JSON.parse(item.photos || '[]')
-    }));
-
-    const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-    return new Response(JSON.stringify({
-      items,
-      total,
-      itemCount: items.length
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Get cart error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch cart' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// ===== CHAT/MESSAGING ENDPOINTS =====
-
-// Send message
-router.post('/api/messages', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const { threadId, content, type = 'text' } = await request.json();
-
-    if (!threadId || !content) {
-      return new Response(JSON.stringify({ error: 'threadId and content are required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Check if thread exists and user has access
-    const thread = await env.PET_DB.prepare(`
-      SELECT * FROM threads WHERE id = ? AND (participant1Id = ? OR participant2Id = ?)
-    `).bind(threadId, user.id, user.id).first();
-
-    if (!thread) {
-      return new Response(JSON.stringify({ error: 'Thread not found or access denied' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Create message
-    const messageId = generateId();
-    await env.PET_DB.prepare(`
-      INSERT INTO messages (id, threadId, senderId, content, type)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(messageId, threadId, user.id, content, type).run();
-
-    // Update thread last activity
-    await env.PET_DB.prepare(`
-      UPDATE threads SET lastMessageAt = datetime('now') WHERE id = ?
-    `).bind(threadId).run();
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      messageId,
-      message: 'Message sent' 
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Send message error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to send message' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Get messages for a thread
-router.get('/api/threads/:threadId/messages', async (request, env) => {
-  const authResult = await requireAuth(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const threadId = request.params.threadId;
-    const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 50, 100);
-    const offset = (page - 1) * limit;
-
-    // Check if user has access to thread
-    const thread = await env.PET_DB.prepare(`
-      SELECT * FROM threads WHERE id = ? AND (participant1Id = ? OR participant2Id = ?)
-    `).bind(threadId, user.id, user.id).first();
-
-    if (!thread) {
-      return new Response(JSON.stringify({ error: 'Thread not found or access denied' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    const messages = await env.PET_DB.prepare(`
-      SELECT m.*, u.fullName as senderName, u.avatarUrl as senderAvatar
-      FROM messages m
-      LEFT JOIN users u ON m.senderId = u.id
-      WHERE m.threadId = ?
-      ORDER BY m.createdAt DESC
-      LIMIT ? OFFSET ?
-    `).bind(threadId, limit, offset).all();
-
-    return new Response(JSON.stringify({
-      messages: messages.results.reverse(), // Reverse for chronological order
-      thread,
-      pagination: {
-        page,
-        limit,
-        hasMore: messages.results.length === limit
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Get messages error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch messages' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// ===== ADMIN ENDPOINTS =====
-
-// Get pending pets for approval
-router.get('/api/admin/pets/pending', async (request, env) => {
-  const authResult = await requireRole(['admin'])(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
-    const offset = (page - 1) * limit;
-
-    const pets = await env.PET_DB.prepare(`
-      SELECT p.*, u.fullName as sellerName, u.email as sellerEmail
-      FROM pets p
-      LEFT JOIN users u ON p.sellerId = u.id
-      WHERE p.status = 'pending'
-      ORDER BY p.createdAt ASC
-      LIMIT ? OFFSET ?
-    `).bind(limit, offset).all();
-
-    const countResult = await env.PET_DB.prepare(`
-      SELECT COUNT(*) as total FROM pets WHERE status = 'pending'
-    `).first();
-
-    return new Response(JSON.stringify({
-      pets: pets.results.map(pet => ({
-        ...pet,
-        photos: JSON.parse(pet.photos || '[]'),
-        personalityTraits: pet.personalityTraits ? pet.personalityTraits.split(',') : []
-      })),
-      pagination: {
-        page,
-        limit,
-        total: countResult.total,
-        totalPages: Math.ceil(countResult.total / limit)
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Get pending pets error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch pending pets' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Approve/reject pet
-router.put('/api/admin/pets/:id/status', async (request, env) => {
-  const authResult = await requireRole(['admin'])(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const { user } = authResult;
-    const petId = request.params.id;
-    const { status, reason } = await request.json();
-
-    if (!['approved', 'rejected'].includes(status)) {
-      return new Response(JSON.stringify({ error: 'Invalid status' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
-
-    // Update pet status
-    await env.PET_DB.prepare(`
-      UPDATE pets SET status = ?, updatedAt = ? WHERE id = ?
-    `).bind(status, new Date().toISOString(), petId).run();
-
-    // Log audit
-    await logAudit(env, user.id, 'MODERATE', 'pet', petId, { status, reason });
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      message: `Pet ${status} successfully` 
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Update pet status error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update pet status' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// Get platform statistics
-router.get('/api/admin/stats', async (request, env) => {
-  const authResult = await requireRole(['admin'])(request, env);
-  if (authResult.error) {
-    return new Response(JSON.stringify(authResult), {
-      status: authResult.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-
-  try {
-    const stats = await Promise.all([
-      env.PET_DB.prepare(`SELECT COUNT(*) as total FROM users`).first(),
-      env.PET_DB.prepare(`SELECT COUNT(*) as total FROM pets WHERE status = 'approved'`).first(),
-      env.PET_DB.prepare(`SELECT COUNT(*) as total FROM pets WHERE status = 'pending'`).first(),
-      env.PET_DB.prepare(`SELECT COUNT(*) as total FROM orders WHERE status = 'completed'`).first(),
-    ]);
-
-    return new Response(JSON.stringify({
-      totalUsers: stats[0].total,
-      approvedPets: stats[1].total,
-      pendingPets: stats[2].total,
-      completedOrders: stats[3].total,
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-
-  } catch (error) {
-    console.error('Get admin stats error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch statistics' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
-  }
-});
-
-// 404 handler
-router.all('*', () => {
-  return new Response(JSON.stringify({ error: 'Not found' }), {
-    status: 404,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders }
-  });
-});
-
-// Main handler
-export default {
-  async fetch(request, env, ctx) {
-    try {
-      // Handle CORS preflight requests immediately
-      if (request.method === 'OPTIONS') {
-        const dynamicCorsHeaders = setCorsHeaders(request, env);
-        return new Response(null, {
-          status: 200,
-          headers: {
-            ...dynamicCorsHeaders,
-            'Content-Length': '0'
-          }
-        });
+      if (request.method === "GET") {
+        switch (action) {
+          case "getStores":
+            return await handleGetStores(db, ALLOWED_ORIGIN);
+          case "getMessages":
+            return await handleGetChat(url, db, ALLOWED_ORIGIN);
+          case "checkId":
+            return await handleCheckId(url, db, ALLOWED_ORIGIN);
+          case "getTransaction":
+            return await handleGetTransaction(url, db, ALLOWED_ORIGIN);
+          case "getUser":
+            return await handleGetUser(url, db, ALLOWED_ORIGIN);
+          case "getUsers":
+            return await handleGetUsers(url, db, ALLOWED_ORIGIN);
+          case "checkdk":
+            return await handleCheckSchedule(url, db, ALLOWED_ORIGIN);
+          case "User":
+            return await getUser(url, db, ALLOWED_ORIGIN);
+          case "updateOrderStatus":
+            return await updateOrderStatus(url, db, ALLOWED_ORIGIN);
+          case "getOrders":
+            return await getOrders(url, db, ALLOWED_ORIGIN);
+          case "cancelOrder":
+            return await cancelOrder(url, db, ALLOWED_ORIGIN);
+          case "getOrderById":
+            return await getOrderById(url, db, ALLOWED_ORIGIN);
+          case "checkTransaction":
+            const transactionId = url.searchParams.get("transactionId");
+            if (!transactionId) return jsonResponse({ message: "Thiếu transactionId!" }, 400);
+            const result = await checkTransactionStatus(transactionId, db);
+            return jsonResponse(result, result.success !== undefined ? 200 : 500);
+          default:
+            return jsonResponse({ message: "Action không hợp lệ!" }, 400);
+        }
       }
 
-      // Handle CORS for all requests
-      const dynamicCorsHeaders = setCorsHeaders(request, env);
-      
-      // Override global corsHeaders with dynamic ones
-      Object.assign(corsHeaders, dynamicCorsHeaders);
-
-      // Rate limiting
-      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-      const rateLimitResult = await rateLimit(env, `rate_limit_${ip}`, 1000, 3600); // 1000 requests per hour
-      
-      if (rateLimitResult.error) {
-        return new Response(JSON.stringify(rateLimitResult), {
-          status: rateLimitResult.status,
-          headers: { 'Content-Type': 'application/json', ...dynamicCorsHeaders }
-        });
-      }
-
-      return router.handle(request, env, ctx);
+      return jsonResponse({ message: "Phương thức không được hỗ trợ!" }, 405);
     } catch (error) {
-      console.error('Worker error:', error);
-      const dynamicCorsHeaders = setCorsHeaders(request, env);
-      return new Response(JSON.stringify({ error: 'Internal server error' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...dynamicCorsHeaders }
-      });
+      console.error("Lỗi xử lý yêu cầu:", error);
+      return jsonResponse({ message: "Lỗi xử lý yêu cầu!", error: error.message }, 500);
     }
-  }
+  },
 };
