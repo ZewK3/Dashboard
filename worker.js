@@ -175,7 +175,7 @@ const verifyJWT = async (token, secret) => {
   }
 };
 
-const createSlug = (title) => {
+const generateSlug = (title) => {
   return title
     .toLowerCase()
     .normalize('NFD')
@@ -675,8 +675,10 @@ router.get('/api/pets', async (request, env) => {
     const search = url.searchParams.get('search') || '';
     const species = url.searchParams.get('species') || '';
     const province = url.searchParams.get('province') || '';
-    const priceMin = parseInt(url.searchParams.get('priceMin')) || 0;
-    const priceMax = parseInt(url.searchParams.get('priceMax')) || 999999999;
+    const priceMinParam = url.searchParams.get('priceMin');
+    const priceMaxParam = url.searchParams.get('priceMax');
+    const priceMin = priceMinParam ? parseInt(priceMinParam, 10) : 0;
+    const priceMax = priceMaxParam ? parseInt(priceMaxParam, 10) : 999999999;
     const page = parseInt(url.searchParams.get('page')) || 1;
     const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 100);
     const offset = (page - 1) * limit;
