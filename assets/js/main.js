@@ -13,10 +13,11 @@ let currentUser = null;
 
 // Configuration
 const CONFIG = {
-  API_BASE_URL: window.location.hostname === 'localhost' ? 'http://localhost:8787' : 'https://api.petmarket.vn',
+  API_BASE_URL: 'https://hipet-market-api.tocotoco.workers.dev',
   DEFAULT_LANGUAGE: 'vi',
   DEBOUNCE_DELAY: 300,
-  TOAST_DURATION: 5000
+  TOAST_DURATION: 5000,
+  DEMO_MODE: false
 };
 
 // Initialize application
@@ -65,7 +66,7 @@ const init = async () => {
     // Dispatch app initialized event
     window.dispatchEvent(new CustomEvent('app:initialized'));
     
-    console.log('Pet Marketplace application initialized successfully' + (CONFIG.DEMO_MODE ? ' (Demo Mode)' : ''));
+    console.log('Pet Marketplace application initialized successfully');
     
   } catch (error) {
     console.error('Failed to initialize application:', error);
@@ -1665,8 +1666,7 @@ window.toggleFavorite = (petId) => {
     return;
   }
   
-  console.log('Toggle favorite for pet:', petId);
-  showToast('Đã thêm vào danh sách yêu thích! 💖', 'success');
+    showToast('Đã thêm vào danh sách yêu thích! 💖', 'success');
 };
 
 window.addToCart = (petId) => {
@@ -1676,8 +1676,7 @@ window.addToCart = (petId) => {
     return;
   }
   
-  console.log('Add to cart pet:', petId);
-  showToast('Đã thêm vào giỏ hàng! 🛒💕', 'success');
+    showToast('Đã thêm vào giỏ hàng! 🛒💕', 'success');
 };
 
 window.viewPetDetails = (petId) => {
