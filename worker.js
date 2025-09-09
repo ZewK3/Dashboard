@@ -677,10 +677,12 @@ router.get('/api/pets', async (request, env) => {
     const province = url.searchParams.get('province') || '';
     const priceMinParam = url.searchParams.get('priceMin');
     const priceMaxParam = url.searchParams.get('priceMax');
-    const priceMin = priceMinParam ? parseInt(priceMinParam, 10) : 0;
-    const priceMax = priceMaxParam ? parseInt(priceMaxParam, 10) : 999999999;
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 100);
+    const priceMin = priceMinParam ? (parseInt(priceMinParam, 10) || 0) : 0;
+    const priceMax = priceMaxParam ? (parseInt(priceMaxParam, 10) || 999999999) : 999999999;
+    const pageParam = url.searchParams.get('page');
+    const limitParam = url.searchParams.get('limit');
+    const page = pageParam ? (parseInt(pageParam, 10) || 1) : 1;
+    const limit = Math.min(limitParam ? (parseInt(limitParam, 10) || 20) : 20, 100);
     const offset = (page - 1) * limit;
 
     let whereConditions = ['status IN (?, ?)'];
@@ -1163,8 +1165,10 @@ router.get('/api/seller/pets', async (request, env) => {
     const { user } = authResult;
     const url = new URL(request.url);
     const status = url.searchParams.get('status') || 'all';
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
+    const pageParam = url.searchParams.get('page');
+    const limitParam = url.searchParams.get('limit');
+    const page = pageParam ? (parseInt(pageParam, 10) || 1) : 1;
+    const limit = Math.min(limitParam ? (parseInt(limitParam, 10) || 20) : 20, 50);
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE sellerId = ?';
@@ -1329,8 +1333,10 @@ router.get('/api/favorites', async (request, env) => {
   try {
     const { user } = authResult;
     const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
+    const pageParam = url.searchParams.get('page');
+    const limitParam = url.searchParams.get('limit');
+    const page = pageParam ? (parseInt(pageParam, 10) || 1) : 1;
+    const limit = Math.min(limitParam ? (parseInt(limitParam, 10) || 20) : 20, 50);
     const offset = (page - 1) * limit;
 
     const favorites = await env.PET_DB.prepare(`
@@ -1583,8 +1589,10 @@ router.get('/api/threads/:threadId/messages', async (request, env) => {
     const { user } = authResult;
     const threadId = request.params.threadId;
     const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 50, 100);
+    const pageParam = url.searchParams.get('page');
+    const limitParam = url.searchParams.get('limit');
+    const page = pageParam ? (parseInt(pageParam, 10) || 1) : 1;
+    const limit = Math.min(limitParam ? (parseInt(limitParam, 10) || 50) : 50, 100);
     const offset = (page - 1) * limit;
 
     // Check if user has access to thread
@@ -1643,8 +1651,10 @@ router.get('/api/admin/pets/pending', async (request, env) => {
 
   try {
     const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page')) || 1;
-    const limit = Math.min(parseInt(url.searchParams.get('limit')) || 20, 50);
+    const pageParam = url.searchParams.get('page');
+    const limitParam = url.searchParams.get('limit');
+    const page = pageParam ? (parseInt(pageParam, 10) || 1) : 1;
+    const limit = Math.min(limitParam ? (parseInt(limitParam, 10) || 20) : 20, 50);
     const offset = (page - 1) * limit;
 
     const pets = await env.PET_DB.prepare(`
