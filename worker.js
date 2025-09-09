@@ -95,10 +95,12 @@ const router = new SimpleRouter();
 
 // CORS headers for all responses
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // Will be replaced with env.ALLOWED_ORIGIN in production
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token',
-  'Access-Control-Allow-Credentials': 'true',
+  'Access-Control-Allow-Origin': '*', // Will be set dynamically based on request origin
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Requested-With, Accept, Origin, Cache-Control, X-File-Name',
+  'Access-Control-Allow-Credentials': 'false', // Set to false to allow wildcard origin
+  'Access-Control-Max-Age': '86400', // 24 hours preflight cache
+  'Access-Control-Expose-Headers': 'X-Total-Count, X-Page-Count',
 };
 
 // Utility functions
@@ -314,11 +316,39 @@ const rateLimit = async (env, key, limit = 100, window = 3600) => {
   }
 };
 
-// CORS preflight handler
-router.options('*', () => {
+// Helper function to set CORS headers dynamically
+const setCorsHeaders = (request, env) => {
+  const origin = request.headers.get('Origin');
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:8080', 
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8080',
+    'https://hipet-market.pages.dev',
+    'https://petmarket.tocotoco.workers.dev',
+    env.ALLOWED_ORIGIN
+  ].filter(Boolean);
+
+  const headers = { ...corsHeaders };
+  
+  // Set specific origin if it's in allowed list, otherwise use wildcard
+  if (origin && allowedOrigins.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Credentials'] = 'true';
+  } else {
+    headers['Access-Control-Allow-Origin'] = '*';
+    headers['Access-Control-Allow-Credentials'] = 'false';
+  }
+  
+  return headers;
+};
+
+// CORS preflight handler with enhanced headers
+router.options('*', (request, env) => {
+  const dynamicCorsHeaders = setCorsHeaders(request, env);
   return new Response(null, {
-    status: 204,
-    headers: corsHeaders
+    status: 200, // Changed from 204 to 200 for better compatibility
+    headers: dynamicCorsHeaders
   });
 });
 
@@ -1787,8 +1817,11 @@ router.all('*', () => {
 export default {
   async fetch(request, env, ctx) {
     try {
-      // Set CORS origin from environment
-      corsHeaders['Access-Control-Allow-Origin'] = env.ALLOWED_ORIGIN || '*';
+      // Handle CORS for all requests
+      const dynamicCorsHeaders = setCorsHeaders(request, env);
+      
+      // Override global corsHeaders with dynamic ones
+      Object.assign(corsHeaders, dynamicCorsHeaders);
 
       // Rate limiting
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
@@ -1797,16 +1830,17 @@ export default {
       if (rateLimitResult.error) {
         return new Response(JSON.stringify(rateLimitResult), {
           status: rateLimitResult.status,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          headers: { 'Content-Type': 'application/json', ...dynamicCorsHeaders }
         });
       }
 
       return router.handle(request, env, ctx);
     } catch (error) {
       console.error('Worker error:', error);
+      const dynamicCorsHeaders = setCorsHeaders(request, env);
       return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        headers: { 'Content-Type': 'application/json', ...dynamicCorsHeaders }
       });
     }
   }
