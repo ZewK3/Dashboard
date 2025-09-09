@@ -58,10 +58,7 @@ const init = async () => {
       await performHealthCheck();
     }
     
-    // Seed development data if needed (skip in demo mode)
-    if (window.location.hostname === 'localhost' && !CONFIG.DEMO_MODE) {
-      await seedDevelopmentData();
-    }
+    // No development data seeding needed in production mode
     
     isInitialized = true;
     
@@ -1215,7 +1212,17 @@ const loadFeaturedPets = async () => {
       status: 'approved'
     });
     
-    featuredGrid.innerHTML = response.pets.map(pet => createPetCard(pet)).join('');
+    // Handle different response structures
+    const pets = response?.data?.pets || response?.pets || response || [];
+    
+    // Ensure pets is an array
+    const petsArray = Array.isArray(pets) ? pets : [];
+    featuredGrid.innerHTML = petsArray.map(pet => createPetCard(pet)).join('');
+    
+    // If no pets found, show placeholder
+    if (petsArray.length === 0) {
+      featuredGrid.innerHTML = '<p class="info-message">Chưa có thú cưng nào được duyệt</p>';
+    }
     
   } catch (error) {
     console.error('Error loading featured pets:', error);
@@ -1392,7 +1399,9 @@ const loadPets = async (filters = {}) => {
     const response = await api.petsAPI.getPets(filters);
     
     if (response.success) {
-      displayPets(response.pets || []);
+      const pets = response?.data?.pets || response?.pets || response || [];
+      const petsArray = Array.isArray(pets) ? pets : [];
+      displayPets(petsArray);
     } else {
       showToast('Không thể tải danh sách thú cưng', 'error');
     }
@@ -1533,7 +1542,9 @@ const loadSellerListings = async () => {
     const response = await api.sellersAPI?.getListings({ status });
     
     if (response?.success) {
-      displaySellerListings(response.data.listings || []);
+      const listings = response?.data?.listings || response?.listings || response || [];
+      const listingsArray = Array.isArray(listings) ? listings : [];
+      displaySellerListings(listingsArray);
     }
   } catch (error) {
     console.error('Error loading seller listings:', error);
