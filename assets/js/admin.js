@@ -3,7 +3,7 @@
  * Handles admin authentication and dashboard functionality
  */
 
-import { petsAPI, apiState } from './api.js';
+import { adminAPI, authAPI, apiState } from './api.js';
 import { storage, formatCurrency, formatDate, showToast } from './utils.js';
 
 // Admin state
@@ -16,7 +16,7 @@ let currentTab = 'pending-listings';
 async function initAdmin() {
     try {
         // Check if user is authenticated and has admin role
-        const result = await petsAPI.auth.getProfile();
+        const result = await authAPI.getProfile();
         
         if (!result.success) {
             showLoginModal();
@@ -81,7 +81,7 @@ async function handleAdminLogin(event) {
     const password = document.getElementById('admin-password').value;
     
     try {
-        const result = await petsAPI.auth.login(email, password);
+        const result = await authAPI.login(email, password);
         
         if (!result.success) {
             showToast(result.error || 'Đăng nhập không thành công', 'error');
@@ -91,7 +91,7 @@ async function handleAdminLogin(event) {
         const user = result.data.user;
         if (user.role !== 'admin') {
             showToast('Tài khoản này không có quyền quản trị', 'error');
-            await petsAPI.auth.logout();
+            await authAPI.logout();
             return;
         }
 
@@ -122,7 +122,7 @@ async function loadDashboardData() {
  */
 async function loadStats() {
     try {
-        const result = await petsAPI.admin.getStats();
+        const result = await adminAPI.getStats();
         
         if (result.success) {
             const stats = result.data;
@@ -141,7 +141,7 @@ async function loadStats() {
  */
 async function loadPendingPets() {
     try {
-        const result = await petsAPI.admin.getPendingPets();
+        const result = await adminAPI.getPendingPets();
         const tbody = document.getElementById('pending-pets-list');
         
         if (!result.success) {
@@ -196,7 +196,7 @@ async function loadPendingPets() {
  */
 async function loadUsers() {
     try {
-        const result = await petsAPI.admin.getUsers();
+        const result = await adminAPI.getUsers();
         const tbody = document.getElementById('users-list');
         
         if (!result.success) {
@@ -250,7 +250,7 @@ async function approvePet(petId) {
     if (!confirm('Bạn có chắc muốn duyệt tin đăng này?')) return;
     
     try {
-        const result = await petsAPI.admin.approvePet(petId);
+        const result = await adminAPI.approvePet(petId);
         
         if (result.success) {
             showToast('Đã duyệt tin đăng thành công', 'success');
@@ -273,7 +273,7 @@ async function rejectPet(petId) {
     if (!reason) return;
     
     try {
-        const result = await petsAPI.admin.rejectPet(petId, reason);
+        const result = await adminAPI.rejectPet(petId, reason);
         
         if (result.success) {
             showToast('Đã từ chối tin đăng', 'success');
@@ -317,7 +317,7 @@ async function logout() {
     if (!confirm('Bạn có chắc muốn đăng xuất?')) return;
     
     try {
-        await petsAPI.auth.logout();
+        await authAPI.logout();
         window.location.href = 'index.html';
     } catch (error) {
         console.error('Logout error:', error);

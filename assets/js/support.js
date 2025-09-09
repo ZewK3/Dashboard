@@ -3,7 +3,7 @@
  * Handles support staff authentication and ticket management
  */
 
-import { petsAPI, apiState } from './api.js';
+import { supportAPI, authAPI, chatAPI, apiState } from './api.js';
 import { storage, formatDate, showToast } from './utils.js';
 
 // Support state
@@ -24,7 +24,7 @@ const messageTemplates = {
 async function initSupport() {
     try {
         // Check if user is authenticated and has support role
-        const result = await petsAPI.auth.getProfile();
+        const result = await authAPI.getProfile();
         
         if (!result.success) {
             showLoginModal();
@@ -89,7 +89,7 @@ async function handleSupportLogin(event) {
     const password = document.getElementById('support-password').value;
     
     try {
-        const result = await petsAPI.auth.login(email, password);
+        const result = await authAPI.login(email, password);
         
         if (!result.success) {
             showToast(result.error || 'Đăng nhập không thành công', 'error');
@@ -99,7 +99,7 @@ async function handleSupportLogin(event) {
         const user = result.data.user;
         if (user.role !== 'support') {
             showToast('Tài khoản này không có quyền hỗ trợ', 'error');
-            await petsAPI.auth.logout();
+            await authAPI.logout();
             return;
         }
 
@@ -129,7 +129,7 @@ async function loadDashboardData() {
  */
 async function loadStats() {
     try {
-        const result = await petsAPI.support.getTickets();
+        const result = await supportAPI.getTickets();
         
         if (result.success) {
             const allTickets = result.data.tickets || [];
@@ -156,7 +156,7 @@ async function loadStats() {
  */
 async function loadTickets() {
     try {
-        const result = await petsAPI.support.getTickets();
+        const result = await supportAPI.getTickets();
         const ticketListElement = document.getElementById('ticket-list');
         
         if (!result.success) {
@@ -209,7 +209,7 @@ async function loadTickets() {
  */
 async function selectTicket(ticketId) {
     try {
-        const result = await petsAPI.support.getTicket(ticketId);
+        const result = await supportAPI.getTicket(ticketId);
         
         if (!result.success) {
             showToast('Không thể tải thông tin ticket', 'error');
@@ -275,7 +275,7 @@ async function loadTicketMessages() {
     if (!currentTicket) return;
     
     try {
-        const result = await petsAPI.chat.getMessages(currentTicket.chatThreadId);
+        const result = await chatAPI.getMessages(currentTicket.chatThreadId);
         const messagesContainer = document.getElementById('chat-messages');
         
         if (!result.success) {
@@ -327,7 +327,7 @@ async function sendSupportReply(event) {
     }
     
     try {
-        const result = await petsAPI.support.replyToTicket(currentTicket.id, message);
+        const result = await supportAPI.replyToTicket(currentTicket.id, message);
         
         if (result.success) {
             messageInput.value = '';
@@ -352,7 +352,7 @@ async function resolveTicket() {
     if (!confirm('Bạn có chắc muốn đánh dấu ticket này là đã giải quyết?')) return;
     
     try {
-        const result = await petsAPI.support.closeTicket(currentTicket.id);
+        const result = await supportAPI.closeTicket(currentTicket.id);
         
         if (result.success) {
             showToast('Đã đánh dấu ticket là đã giải quyết', 'success');
@@ -378,7 +378,7 @@ async function closeTicket() {
     if (!confirm('Bạn có chắc muốn đóng ticket này?')) return;
     
     try {
-        const result = await petsAPI.support.closeTicket(currentTicket.id);
+        const result = await supportAPI.closeTicket(currentTicket.id);
         
         if (result.success) {
             showToast('Đã đóng ticket thành công', 'success');
@@ -428,7 +428,7 @@ async function logout() {
     if (!confirm('Bạn có chắc muốn đăng xuất?')) return;
     
     try {
-        await petsAPI.auth.logout();
+        await authAPI.logout();
         window.location.href = 'index.html';
     } catch (error) {
         console.error('Logout error:', error);

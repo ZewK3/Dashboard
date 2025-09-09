@@ -173,17 +173,15 @@ const petsAPI = {
     });
   },
 
+  // Update and delete operations not supported by backend
   async update(id, petData) {
-    return await apiRequest(`/pets/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(petData)
-    });
+    console.warn('Pet update operation not supported by backend');
+    return { success: false, error: 'Update operation not supported' };
   },
 
   async delete(id) {
-    return await apiRequest(`/pets/${id}`, {
-      method: 'DELETE'
-    });
+    console.warn('Pet delete operation not supported by backend');
+    return { success: false, error: 'Delete operation not supported' };
   },
 
   async search(query, filters = {}) {
@@ -204,24 +202,20 @@ const sellersAPI = {
     return await apiRequest(`/seller/listings?${params}`);
   },
 
+  // Use pets API for creating listings
   async createListing(petData) {
-    return await apiRequest('/seller/listings', {
-      method: 'POST',
-      body: JSON.stringify(petData)
-    });
+    return await petsAPI.create(petData);
   },
 
+  // Update and delete operations not supported by backend
   async updateListing(id, petData) {
-    return await apiRequest(`/seller/listings/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(petData)
-    });
+    console.warn('Pet update operation not supported by backend');
+    return { success: false, error: 'Update operation not supported. Please contact admin.' };
   },
 
   async deleteListing(id) {
-    return await apiRequest(`/seller/listings/${id}`, {
-      method: 'DELETE'
-    });
+    console.warn('Pet delete operation not supported by backend');
+    return { success: false, error: 'Delete operation not supported. Please contact admin.' };
   }
 };
 
@@ -267,10 +261,10 @@ const cartAPI = {
     });
   },
 
+  // Clear cart operation not supported by backend
   async clear() {
-    return await apiRequest('/cart', {
-      method: 'DELETE'
-    });
+    console.warn('Cart clear operation not supported by backend');
+    return { success: false, error: 'Clear cart operation not supported' };
   }
 };
 
@@ -294,28 +288,26 @@ const favoritesAPI = {
   }
 };
 
-// Chat API
+// Chat API - Not implemented in backend
 const chatAPI = {
   async getThreads() {
-    return await apiRequest('/chat/threads');
+    console.warn('Chat API not implemented in backend');
+    return { success: false, error: 'Chat functionality not available' };
   },
 
   async getMessages(threadId) {
-    return await apiRequest(`/chat/threads/${threadId}/messages`);
+    console.warn('Chat API not implemented in backend');
+    return { success: false, error: 'Chat functionality not available' };
   },
 
   async sendMessage(threadId, message) {
-    return await apiRequest(`/chat/threads/${threadId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({ message })
-    });
+    console.warn('Chat API not implemented in backend');
+    return { success: false, error: 'Chat functionality not available' };
   },
 
   async createThread(recipientId, subject) {
-    return await apiRequest('/chat/threads', {
-      method: 'POST',
-      body: JSON.stringify({ recipientId, subject })
-    });
+    console.warn('Chat API not implemented in backend');
+    return { success: false, error: 'Chat functionality not available' };
   }
 };
 
@@ -355,47 +347,44 @@ const adminAPI = {
     });
   },
 
+  // Reject pet operation not supported by backend
   async rejectPet(petId, reason) {
-    return await apiRequest(`/admin/pets/${petId}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ reason })
-    });
+    console.warn('Pet reject operation not supported by backend');
+    return { success: false, error: 'Reject operation not supported' };
   },
 
+  // User management operations not supported by backend
   async getUsers(filters = {}) {
-    const params = new URLSearchParams(filters);
-    return await apiRequest(`/admin/users?${params}`);
+    console.warn('User management not supported by backend');
+    return { success: false, error: 'User management not available' };
   },
 
   async updateUser(userId, userData) {
-    return await apiRequest(`/admin/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData)
-    });
+    console.warn('User management not supported by backend');
+    return { success: false, error: 'User management not available' };
   }
 };
 
-// Support API  
+// Support API - Not implemented in backend  
 const supportAPI = {
   async getTickets() {
-    return await apiRequest('/support/tickets');
+    console.warn('Support API not implemented in backend');
+    return { success: false, error: 'Support functionality not available' };
   },
 
   async getTicket(ticketId) {
-    return await apiRequest(`/support/tickets/${ticketId}`);
+    console.warn('Support API not implemented in backend');
+    return { success: false, error: 'Support functionality not available' };
   },
 
   async replyToTicket(ticketId, message) {
-    return await apiRequest(`/support/tickets/${ticketId}/reply`, {
-      method: 'POST',
-      body: JSON.stringify({ message })
-    });
+    console.warn('Support API not implemented in backend');
+    return { success: false, error: 'Support functionality not available' };
   },
 
   async closeTicket(ticketId) {
-    return await apiRequest(`/support/tickets/${ticketId}/close`, {
-      method: 'POST'
-    });
+    console.warn('Support API not implemented in backend');
+    return { success: false, error: 'Support functionality not available' };
   }
 };
 
