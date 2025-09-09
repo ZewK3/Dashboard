@@ -97,10 +97,11 @@ const router = new SimpleRouter();
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*', // Will be set dynamically based on request origin
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Requested-With, Accept, Origin, Cache-Control, X-File-Name',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Requested-With, Accept, Origin, Cache-Control, X-File-Name, Accept-Language, Accept-Encoding',
   'Access-Control-Allow-Credentials': 'false', // Set to false to allow wildcard origin
   'Access-Control-Max-Age': '86400', // 24 hours preflight cache
   'Access-Control-Expose-Headers': 'X-Total-Count, X-Page-Count',
+  'Vary': 'Origin', // Important for proper CORS handling
 };
 
 // Utility functions
@@ -326,6 +327,7 @@ const setCorsHeaders = (request, env) => {
     'http://127.0.0.1:8080',
     'https://hipet-market.pages.dev',
     'https://petmarket.tocotoco.workers.dev',
+    'https://zewk3.github.io', // Add GitHub Pages origin
     env.ALLOWED_ORIGIN
   ].filter(Boolean);
 
@@ -345,11 +347,25 @@ const setCorsHeaders = (request, env) => {
 
 // CORS preflight handler with enhanced headers
 router.options('*', (request, env) => {
-  const dynamicCorsHeaders = setCorsHeaders(request, env);
-  return new Response(null, {
-    status: 200, // Changed from 204 to 200 for better compatibility
-    headers: dynamicCorsHeaders
-  });
+  try {
+    const dynamicCorsHeaders = setCorsHeaders(request, env);
+    return new Response(null, {
+      status: 200, // HTTP 200 required for successful preflight
+      headers: {
+        ...dynamicCorsHeaders,
+        'Content-Length': '0'
+      }
+    });
+  } catch (error) {
+    console.error('CORS preflight error:', error);
+    return new Response(null, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Length': '0'
+      }
+    });
+  }
 });
 
 // Health check
@@ -1817,6 +1833,18 @@ router.all('*', () => {
 export default {
   async fetch(request, env, ctx) {
     try {
+      // Handle CORS preflight requests immediately
+      if (request.method === 'OPTIONS') {
+        const dynamicCorsHeaders = setCorsHeaders(request, env);
+        return new Response(null, {
+          status: 200,
+          headers: {
+            ...dynamicCorsHeaders,
+            'Content-Length': '0'
+          }
+        });
+      }
+
       // Handle CORS for all requests
       const dynamicCorsHeaders = setCorsHeaders(request, env);
       
