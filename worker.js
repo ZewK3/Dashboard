@@ -1,899 +1,862 @@
-const ALLOWED_ORIGIN = "https://zewk.fun";
-
-// Hàm tiện ích trả về JSON response
-function jsonResponse(body, status, origin = ALLOWED_ORIGIN) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    },
-  });
-}
-
-// Hàm tiện ích xử lý CORS cho OPTIONS request
-function handleOptionsRequest() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    },
-  });
-}
-
-// Hàm mã hóa mật khẩu bằng SHA-256
-async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-// Middleware kiểm tra phiên người dùng
-async function checkSessionMiddleware(token, db, allowedOrigin) {
-  if (!token) return jsonResponse({ message: "Thiếu token!" }, 401, allowedOrigin);
-
-  try {
-    const session = await db
-      .prepare("SELECT employeeId, expiresAt FROM sessions WHERE token = ?")
-      .bind(token)
-      .first();
-
-    if (!session) return jsonResponse({ message: "Phiên không tồn tại!" }, 401, allowedOrigin);
-
-    const now = new Date();
-    const expiresAt = new Date(session.expiresAt);
-    if (now > expiresAt) return jsonResponse({ message: "Phiên đã hết hạn!" }, 401, allowedOrigin);
-
-    return { employeeId: session.employeeId, valid: true };
-  } catch (error) {
-    console.error("Lỗi kiểm tra phiên:", error);
-    return jsonResponse({ message: "Lỗi kiểm tra phiên!", error: error.message }, 500, allowedOrigin);
-  }
-}
-
-// Hàm tạo hoặc cập nhật phiên người dùng
-async function createSession(employeeId, db, allowedOrigin) {
-  const token = crypto.randomUUID();
-  const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + 1); // Phiên hết hạn sau 1 giờ
-
-  try {
-    const existingSession = await db
-      .prepare("SELECT * FROM sessions WHERE employeeId = ?")
-      .bind(employeeId)
-      .first();
-
-    const query = existingSession
-      ? "UPDATE sessions SET token = ?, expiresAt = ? WHERE employeeId = ?"
-      : "INSERT INTO sessions (employeeId, token, expiresAt) VALUES (?, ?, ?)";
-    const params = existingSession
-      ? [token, expiresAt.toISOString(), employeeId]
-      : [employeeId, token, expiresAt.toISOString()];
-
-    await db.prepare(query).bind(...params).run();
-
-    return jsonResponse({ token, expiresAt: expiresAt.toISOString() }, 200, allowedOrigin);
-  } catch (error) {
-    console.error("Lỗi tạo hoặc cập nhật phiên:", error);
-    return jsonResponse({ message: "Lỗi tạo hoặc cập nhật phiên!", error: error.message }, 500, allowedOrigin);
-  }
-}
-
-// Hàm tính rank dựa trên điểm kinh nghiệm
-function calculateRank(exp) {
-  if (exp >= 5000) return "Kim Cương";
-  if (exp >= 2000) return "Bạch Kim";
-  if (exp >= 1000) return "Vàng";
-  if (exp >= 500) return "Bạc";
-  return "Đồng";
-}
-
-// Hàm đăng ký người dùng (khách hàng)
-async function registerUser(body, db, origin) {
-  const { name, email, password } = body;
-  if (!name || name.trim() === "" || !email || email.trim() === "" || !password || password.trim() === "") {
-    return jsonResponse({ message: "Thiếu thông tin hoặc thông tin không hợp lệ!" }, 400, origin);
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^[0-9]{10,11}$/;
-  if (!emailRegex.test(email) && !phoneRegex.test(email)) {
-    return jsonResponse({ message: "Email hoặc số điện thoại không hợp lệ!" }, 400, origin);
-  }
-
-  if (password.length < 6) {
-    return jsonResponse({ message: "Mật khẩu phải có ít nhất 6 ký tự!" }, 400, origin);
-  }
-
-  const existing = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
-  if (existing) return jsonResponse({ message: "Email đã tồn tại!" }, 409, origin);
-
-  const hashedPassword = await hashPassword(password);
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-
-  try {
-    await db
-      .prepare("INSERT INTO users (id, name, email, password, createdAt, exp, rank) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(id, name, email, hashedPassword, now, 0, "Đồng")
-      .run();
-  } catch (error) {
-    console.error("Lỗi khi tạo người dùng:", error);
-    return jsonResponse({ message: "Lỗi tạo người dùng!", error: error.message }, 500, origin);
-  }
-
-  return await createSession(id, db, origin);
-}
-
-// Hàm đăng nhập người dùng (khách hàng)
-async function loginUser(body, db, origin) {
-  const { email, password } = body;
-  if (!email || email.trim() === "" || !password || password.trim() === "") {
-    return jsonResponse({ message: "Thiếu email hoặc mật khẩu!" }, 400, origin);
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^[0-9]{10,11}$/;
-  if (!emailRegex.test(email) && !phoneRegex.test(email)) {
-    return jsonResponse({ message: "Email hoặc số điện thoại không hợp lệ!" }, 400, origin);
-  }
-
-  const user = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
-  if (!user) return jsonResponse({ message: "Tài khoản không tồn tại!" }, 404, origin);
-
-  const hashedPassword = await hashPassword(password);
-  if (user.password !== hashedPassword) {
-    return jsonResponse({ message: "Mật khẩu không đúng!" }, 401, origin);
-  }
-
-  return await createSession(user.id, db, origin);
-}
-
-// Hàm lấy thông tin người dùng (khách hàng)
-async function getUser(url, db, origin) {
-  const token = url.searchParams.get("token");
-  const session = await checkSessionMiddleware(token, db, origin);
-  if (session instanceof Response) return session;
-
-  const user = await db
-    .prepare("SELECT name, email, exp, rank FROM users WHERE id = ?")
-    .bind(session.employeeId)
-    .first();
-
-  if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
-
-  return jsonResponse({ name: user.name, email: user.email, exp: user.exp, rank: user.rank }, 200, origin);
-}
-
-// Hàm cập nhật thông tin người dùng (khách hàng)
-async function updateUser(body, userId, db, origin) {
-  const { name, email, password } = body;
-
-  if (!name && !email && !password) {
-    return jsonResponse({ message: "Không có thông tin nào để cập nhật!" }, 400, origin);
-  }
-
-  const user = await db.prepare("SELECT * FROM users WHERE id = ?").bind(userId).first();
-  if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
-
-  const updates = {};
-  if (name && name.trim() !== "") updates.name = name.trim();
-  if (email && email.trim() !== "") {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^[0-9]{10,11}$/;
-    if (!emailRegex.test(email) && !phoneRegex.test(email)) {
-      return jsonResponse({ message: "Email hoặc số điện thoại không hợp lệ!" }, 400, origin);
-    }
-    const existing = await db.prepare("SELECT * FROM users WHERE email = ? AND id != ?").bind(email, userId).first();
-    if (existing) return jsonResponse({ message: "Email đã tồn tại!" }, 409, origin);
-    updates.email = email.trim();
-  }
-  if (password && password.trim() !== "") {
-    if (password.length < 6) {
-      return jsonResponse({ message: "Mật khẩu phải có ít nhất 6 ký tự!" }, 400, origin);
-    }
-    updates.password = await hashPassword(password);
-  }
-
-  try {
-    const setClause = Object.keys(updates).map(key => `${key} = ?`).join(", ");
-    const values = Object.values(updates).concat(userId);
-    if (setClause) {
-      await db
-        .prepare(`UPDATE users SET ${setClause} WHERE id = ?`)
-        .bind(...values)
-        .run();
-    }
-    return jsonResponse({ message: "Cập nhật thông tin người dùng thành công!" }, 200, origin);
-  } catch (error) {
-    console.error("Lỗi cập nhật thông tin người dùng:", error);
-    return jsonResponse({ message: "Lỗi cập nhật thông tin!", error: error.message }, 500, origin);
-  }
-}
-
-// Hàm điều chỉnh điểm kinh nghiệm người dùng (dành cho admin)
-async function adjustUserExp(body, db, origin) {
-  const { userId, expChange } = body;
-
-  if (!userId || typeof expChange !== "number") {
-    return jsonResponse({ message: "Thiếu userId hoặc expChange không hợp lệ!" }, 400, origin);
-  }
-
-  const user = await db.prepare("SELECT exp FROM users WHERE id = ?").bind(userId).first();
-  if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
-
-  const newExp = Math.max(0, (user.exp || 0) + expChange); // Đảm bảo điểm không âm
-  const newRank = calculateRank(newExp);
-
-  try {
-    await db
-      .prepare("UPDATE users SET exp = ?, rank = ? WHERE id = ?")
-      .bind(newExp, newRank, userId)
-      .run();
-    return jsonResponse({ success: true, newExp, newRank }, 200, origin);
-  } catch (error) {
-    console.error("Lỗi điều chỉnh điểm:", error);
-    return jsonResponse({ message: "Lỗi điều chỉnh điểm!", error: error.message }, 500, origin);
-  }
-}
-
-// Hàm lưu đơn hàng (cập nhật để thêm thông tin giao hàng)
-async function saveOrder(body, userId, db, origin) {
-  const { cart, status, total, deliveryAddress, distance, duration } = body;
-  
-  if (!Array.isArray(cart) || cart.length === 0 || !status || typeof total !== "number") {
-    return jsonResponse({ message: "Dữ liệu đơn hàng không hợp lệ!" }, 400, origin);
-  }
-
-  // Kiểm tra dữ liệu cart chi tiết
-  for (const item of cart) {
-    if (!item.name || typeof item.price !== "number" || typeof item.quantity !== "number") {
-      return jsonResponse({ message: "Dữ liệu sản phẩm trong giỏ hàng không hợp lệ!" }, 400, origin);
-    }
-  }
-
-  const user = await db.prepare("SELECT id FROM users WHERE id = ?").bind(userId).first();
-  if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
-
-  const orderId = `ORDER_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  const now = new Date().toISOString();
-
-  try {
-    await db
-      .prepare("INSERT INTO orders (orderId, userId, cart, status, total, createdAt, deliveryAddress, distance, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(orderId, userId, JSON.stringify(cart), status, total, now, deliveryAddress || null, distance || null, duration || null)
-      .run();
-  } catch (error) {
-    console.error("Lỗi khi lưu đơn hàng:", error);
-    return jsonResponse({ message: "Lỗi lưu đơn hàng!", error: error.message }, 500, origin);
-  }
-
-  return jsonResponse({ orderId }, 200, origin);
-}
-
-// Hàm hủy đơn hàng
-async function cancelOrder(url, db, origin) {
-  const token = url.searchParams.get("token");
-  const orderId = url.searchParams.get("orderId");
-
-  if (!orderId) return jsonResponse({ message: "Thiếu orderId!" }, 400, origin);
-
-  const session = await checkSessionMiddleware(token, db, origin);
-  if (session instanceof Response) return session;
-
-  const order = await db.prepare("SELECT * FROM orders WHERE orderId = ? AND userId = ?").bind(orderId, session.employeeId).first();
-  if (!order) return jsonResponse({ message: "Đơn hàng không tồn tại hoặc không thuộc về bạn!" }, 404, origin);
-
-  if (order.status !== "pending") {
-    return jsonResponse({ message: "Chỉ có thể hủy đơn hàng ở trạng thái 'pending'!" }, 400, origin);
-  }
-
-  try {
-    await db.prepare("UPDATE orders SET status = 'canceled' WHERE orderId = ?").bind(orderId).run();
-    return jsonResponse({ success: true, message: "Đơn hàng đã được hủy!" }, 200, origin);
-  } catch (error) {
-    console.error("Lỗi hủy đơn hàng:", error);
-    return jsonResponse({ message: "Lỗi hủy đơn hàng!", error: error.message }, 500, origin);
-  }
-}
-
-// Hàm lấy chi tiết đơn hàng theo ID
-async function getOrderById(url, db, origin) {
-  const token = url.searchParams.get("token");
-  const orderId = url.searchParams.get("orderId");
-
-  if (!orderId) return jsonResponse({ message: "Thiếu orderId!" }, 400, origin);
-
-  const session = await checkSessionMiddleware(token, db, origin);
-  if (session instanceof Response) return session;
-
-  const order = await db.prepare("SELECT * FROM orders WHERE orderId = ? AND userId = ?").bind(orderId, session.employeeId).first();
-  if (!order) return jsonResponse({ message: "Đơn hàng không tồn tại hoặc không thuộc về bạn!" }, 404, origin);
-
-  return jsonResponse({
-    orderId: order.orderId,
-    cart: JSON.parse(order.cart),
-    status: order.status,
-    total: Number(order.total),
-    createdAt: order.createdAt,
-    deliveryAddress: order.deliveryAddress,
-    distance: order.distance,
-    duration: order.duration
-  }, 200, origin);
-}
-
-// Hàm cập nhật trạng thái đơn hàng và tính điểm
-async function updateOrderStatus(url, db, origin) {
-  const token = url.searchParams.get("token");
-  const orderId = url.searchParams.get("orderId");
-  const status = url.searchParams.get("status");
-
-  if (!orderId || !status) return jsonResponse({ message: "Thiếu orderId hoặc status!" }, 400, origin);
-  if (!["pending", "success", "canceled"].includes(status)) {
-    return jsonResponse({ message: "Trạng thái không hợp lệ!" }, 400, origin);
-  }
-
-  const session = await checkSessionMiddleware(token, db, origin);
-  if (session instanceof Response) return session;
-
-  const order = await db.prepare("SELECT * FROM orders WHERE orderId = ? AND userId = ?").bind(orderId, session.employeeId).first();
-  if (!order) return jsonResponse({ message: "Đơn hàng không tồn tại hoặc không thuộc về bạn!" }, 404, origin);
-
-  await db.prepare("UPDATE orders SET status = ? WHERE orderId = ?").bind(status, orderId).run();
-
-  if (status === "success") {
-    const total = Number(order.total);
-    const expGain = Math.floor(total / 1000);
-    const user = await db.prepare("SELECT exp FROM users WHERE id = ?").bind(session.employeeId).first();
-    if (!user) return jsonResponse({ message: "Người dùng không tồn tại!" }, 404, origin);
-
-    const newExp = (user.exp || 0) + expGain;
-    const newRank = calculateRank(newExp);
-
-    await db
-      .prepare("UPDATE users SET exp = ?, rank = ? WHERE id = ?")
-      .bind(newExp, newRank, session.employeeId)
-      .run();
-
-    return jsonResponse({ success: true, gainedExp: expGain, newExp, newRank }, 200, origin);
-  }
-
-  return jsonResponse({ success: true }, 200, origin);
-}
-
-// Hàm lấy danh sách đơn hàng
-async function getOrders(url, db, origin) {
-  const token = url.searchParams.get("token");
-  const session = await checkSessionMiddleware(token, db, origin);
-  if (session instanceof Response) return session;
-
-  const orders = await db
-    .prepare("SELECT * FROM orders WHERE userId = ? ORDER BY createdAt DESC")
-    .bind(session.employeeId)
-    .all();
-
-  const result = orders.results.map(order => ({
-    orderId: order.orderId,
-    cart: JSON.parse(order.cart),
-    status: order.status,
-    total: Number(order.total),
-    createdAt: order.createdAt,
-    deliveryAddress: order.deliveryAddress,
-    distance: order.distance,
-    duration: order.duration
-  }));
-
-  return jsonResponse({ orders: result }, 200, origin);
-}
-
-// Hàm lấy danh sách cửa hàng
-async function handleGetStores(db, origin) {
-  const stores = await db.prepare("SELECT storeId, storeName FROM stores").all();
-  if (!stores.results || stores.results.length === 0) {
-    return jsonResponse({ message: "Không tìm thấy cửa hàng nào!" }, 404, origin);
-  }
-  return jsonResponse(stores.results, 200, origin);
-}
-
-// Hàm lấy danh sách nhân viên
-async function handleGetUsers(url, db, origin) {
-  const users = await db
-    .prepare("SELECT employeeId, fullName, storeName, position FROM employees")
-    .all();
-
-  if (!users.results || users.results.length === 0) {
-    return jsonResponse({ message: "Không tìm thấy người dùng!" }, 404, origin);
-  }
-  return jsonResponse(users.results, 200, origin);
-}
-
-// Hàm kiểm tra ID nhân viên
-async function handleCheckId(url, db, origin) {
-  const employeeId = url.searchParams.get("employeeId");
-  if (!employeeId) return jsonResponse({ message: "Thiếu mã nhân viên!" }, 400, origin);
-
-  const user = await db
-    .prepare("SELECT employeeId FROM employees WHERE employeeId = ?")
-    .bind(employeeId)
-    .first();
-
-  return user
-    ? jsonResponse({ message: "Tài Khoản Đã Tồn Tại!" }, 400, origin)
-    : jsonResponse({ message: "Tài Khoản Hợp Lệ!" }, 200, origin);
-}
-
-// Hàm lấy giao dịch
-async function handleGetTransaction(url, db, origin) {
-  const startDate = url.searchParams.get("startDate");
-  if (!startDate) return jsonResponse({ message: "Thiếu startDate!" }, 400, origin);
-
-  try {
-    const transactions = await db
-      .prepare("SELECT id, amount, status FROM 'transaction' WHERE date = ?")
-      .bind(startDate)
-      .all();
-
-    if (transactions.results.length === 0) {
-      return jsonResponse({ message: "Không tìm thấy giao dịch trong ngày này" }, 404, origin);
-    }
-    return jsonResponse(transactions.results, 200, origin);
-  } catch (error) {
-    console.error("Lỗi khi lấy giao dịch:", error);
-    return jsonResponse({ message: "Lỗi server", error: error.message }, 500, origin);
-  }
-}
-
-// Hàm kiểm tra trạng thái giao dịch
-async function checkTransactionStatus(transactionId, db) {
-  if (!transactionId) {
-    console.error("Thiếu transactionId!");
-    return { success: false, message: "Thiếu transactionId!" };
-  }
-
-  const payment = await db
-    .prepare('SELECT extractedID, "transaction", dateTime, description FROM payment WHERE extractedID = ?')
-    .bind(transactionId)
-    .first();
-
-  if (!payment) {
-    console.log(`Không tìm thấy giao dịch với extractedID: ${transactionId}`);
-    return { success: false, message: "Giao dịch không tồn tại!" };
-  }
-
+// Pet Marketplace Cloudflare Worker
+// Production-ready backend for pet marketplace with complete API endpoints
+
+// CORS Configuration
+const ALLOWED_ORIGINS = [
+  'https://zewk3.github.io',
+  'https://hipet-market.pages.dev',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+
+// Utility function to handle CORS headers
+function setCorsHeaders(origin) {
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
-    success: true,
-    id: payment.extractedID,
-    amount: payment.transaction,
-    dateTime: payment.dateTime,
-    description: payment.description,
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Credentials': 'false',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
   };
 }
 
-// Hàm lưu thanh toán
-async function handleSavePayment(body, db, origin) {
-  const { emails } = body;
-  if (!emails || !Array.isArray(emails) || emails.length === 0) {
-    return jsonResponse({ message: "Dữ liệu không hợp lệ!" }, 400, origin);
-  }
-
-  const stmt = db.prepare(
-    'INSERT INTO payment ("transaction", accountNumber, dateTime, description, extractedID) VALUES (?, ?, ?, ?, ?)'
-  );
-  const inserts = emails.map(email =>
-    stmt.bind(email.transaction, email.accountNumber, email.dateTime, email.description, email.extractedID)
-  );
-
-  await db.batch(inserts);
-  return jsonResponse({ message: "Dữ liệu đã được lưu thành công!" }, 200, origin);
+// JSON response utility
+function jsonResponse(body, status = 200, origin = null) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...setCorsHeaders(origin)
+    }
+  });
 }
 
-// Hàm lưu giao dịch
-async function handleSaveTransaction(body, db, origin) {
-  const { id, amount, status, date } = body;
-  if (!id || !amount || !status || !date) {
-    return jsonResponse({ message: "Thiếu thông tin giao dịch!" }, 400, origin);
-  }
-
-  if (status !== "success" && status !== "failed") {
-    return jsonResponse({ message: "Trạng thái không hợp lệ!" }, 400, origin);
-  }
-
-  try {
-    await db
-      .prepare("INSERT INTO 'transaction' (id, amount, status, date) VALUES (?, ?, ?, ?)")
-      .bind(id, amount, status, date)
-      .run();
-    return jsonResponse({ message: "Giao dịch đã được lưu thành công!" }, 200, origin);
-  } catch (error) {
-    console.error("Lỗi khi lưu giao dịch:", error);
-    return jsonResponse({ message: "Lỗi lưu giao dịch!", error: error.message }, 500, origin);
-  }
+// Handle preflight OPTIONS requests
+function handleCorsPreflightRequest(origin) {
+  return new Response(null, {
+    status: 200,
+    headers: setCorsHeaders(origin)
+  });
 }
 
-// Hàm kiểm tra lịch làm việc
-async function handleCheckSchedule(url, db, origin) {
-  const employeeId = url.searchParams.get("employeeId");
-  if (!employeeId) return jsonResponse({ message: "Mã nhân viên không hợp lệ!" }, 400, origin);
-
-  const result = await db
-    .prepare("SELECT createdAt, T2, T3, T4, T5, T6, T7, CN FROM workSchedules WHERE employeeId = ?")
-    .bind(employeeId)
-    .first();
-
-  if (!result) {
-    return jsonResponse({ message: "Nhân viên chưa đăng ký lịch làm!" }, 202, origin);
-  }
-
-  const shifts = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(day => ({
-    day,
-    time: result[day] || "Off",
-  }));
-
-  return jsonResponse({ shifts, message: "Nhân viên đã đăng ký lịch làm!" }, 200, origin);
-}
-
-// Hàm lưu lịch làm việc
-async function handleSaveSchedule(body, db, origin) {
-  const { employeeId, shifts } = body;
-  if (!employeeId || !shifts || !Array.isArray(shifts) || shifts.length === 0) {
-    return jsonResponse({ message: "Dữ liệu không hợp lệ!" }, 401, origin);
-  }
-
-  const employee = await db
-    .prepare("SELECT employeeId, fullName, storeName FROM employees WHERE employeeId = ?")
-    .bind(employeeId)
-    .first();
-
-  if (!employee) return jsonResponse({ message: "Mã nhân viên không tồn tại!" }, 404, origin);
-
-  const scheduleData = { T2: null, T3: null, T4: null, T5: null, T6: null, T7: null, CN: null };
-  for (const shift of shifts) {
-    const { day, start, end } = shift;
-    if (end - start < 4) return jsonResponse({ message: `Ca làm tối thiểu 4h ${day}!` }, 402, origin);
-
-    const dayColumn = { T2: "T2", T3: "T3", T4: "T4", T5: "T5", T6: "T6", T7: "T7", CN: "CN" }[day];
-    if (!dayColumn) return jsonResponse({ message: `Ngày ${day} không hợp lệ!` }, 403, origin);
-
-    scheduleData[dayColumn] = `${String(start).padStart(2, "0")}:00-${String(end).padStart(2, "0")}:00`;
-  }
-
-  try {
-    await db
-      .prepare(
-        "INSERT INTO workSchedules (employeeId, fullName, storeName, T2, T3, T4, T5, T6, T7, CN) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      )
-      .bind(
-        employeeId,
-        employee.fullName,
-        employee.storeName,
-        scheduleData.T2,
-        scheduleData.T3,
-        scheduleData.T4,
-        scheduleData.T5,
-        scheduleData.T6,
-        scheduleData.T7,
-        scheduleData.CN
-      )
-      .run();
-    return jsonResponse({ message: "Lịch làm việc đã được lưu thành công!" }, 200, origin);
-  } catch (error) {
-    console.error("Lỗi lưu lịch làm việc:", error);
-    return jsonResponse({ message: "Lỗi lưu lịch làm việc!", error: error.message }, 500, origin);
-  }
-}
-
-// Hàm đăng nhập nhân viên
-async function handleLogin(body, db, origin) {
-  const { loginEmployeeId: employeeId, loginPassword: password } = body;
-  if (!employeeId || !password) {
-    return jsonResponse({ message: "Thiếu mã nhân viên hoặc mật khẩu!" }, 400, origin);
-  }
-
-  const user = await db
-    .prepare("SELECT password, salt FROM employees WHERE employeeId = ?")
-    .bind(employeeId)
-    .first();
-
-  if (!user) return jsonResponse({ message: "Mã nhân viên không tồn tại!" }, 404, origin);
-
-  const storedHash = Uint8Array.from(user.password.split(",").map(Number));
-  const storedSalt = Uint8Array.from(user.salt.split(",").map(Number));
-  const isPasswordCorrect = await verifyPassword(storedHash, storedSalt, password);
-
-  if (!isPasswordCorrect) return jsonResponse({ message: "Mật khẩu không chính xác!" }, 401, origin);
-
-  const session = await createSession(employeeId, db, origin);
-  if (session instanceof Response && session.status === 200) {
-    const token = await db
-      .prepare("SELECT * FROM sessions WHERE employeeId = ?")
-      .bind(employeeId)
-      .first();
-    return jsonResponse(token, 200, origin);
-  }
-  return jsonResponse({ message: "Lỗi tạo phiên làm việc!" }, 500, origin);
-}
-
-// Hàm lấy tin nhắn
-async function handleGetChat(url, db, origin) {
-  const limit = 50;
-  const lastId = parseInt(url.searchParams.get("lastId"));
-
-  const query = lastId
-    ? "SELECT * FROM messages WHERE id > ? ORDER BY id ASC LIMIT ?"
-    : "SELECT * FROM messages ORDER BY id DESC LIMIT ?";
-  const params = lastId ? [lastId, limit] : [limit];
-
-  const messages = await db.prepare(query).bind(...params).all();
-  if (!messages.results || messages.results.length === 0) {
-    return jsonResponse({ message: "Không có tin nhắn nào!" }, 200, origin);
-  }
-
-  const sortedMessages = lastId ? messages.results : messages.results.reverse();
-  return jsonResponse(sortedMessages, 200, origin);
-}
-
-// Hàm lưu tin nhắn
-async function handleSaveChat(body, db, origin) {
-  const { employeeId, fullName, position, message } = body;
-  if (!employeeId || !fullName || !message) {
-    return jsonResponse({ message: "Thiếu dữ liệu cần thiết!" }, 400, origin);
-  }
-
-  const vietnamTime = new Date(Date.now() + 7 * 60 * 60 * 1000);
-  const formattedTime = vietnamTime.toISOString().replace(/T/, " ").replace(/\..+/, "");
-
-  try {
-    await db
-      .prepare("INSERT INTO messages (employeeId, fullName, position, message, time) VALUES (?, ?, ?, ?, ?)")
-      .bind(employeeId, fullName, position, message, formattedTime)
-      .run();
-    return jsonResponse({ message: "Gửi tin nhắn thành công!" }, 200, origin);
-  } catch (error) {
-    console.error("Lỗi lưu tin nhắn:", error);
-    return jsonResponse({ message: "Lỗi lưu tin nhắn!", error: error.message }, 500, origin);
-  }
-}
-
-// Hàm lấy thông tin nhân viên
-async function handleGetUser(url, db, origin) {
-  const employeeId = url.searchParams.get("employeeId");
-  if (!employeeId) return jsonResponse({ message: "Thiếu mã nhân viên!" }, 400, origin);
-
-  const user = await db
-    .prepare(
-      "SELECT employeeId, fullName, storeName, position, joinDate, phone, email FROM employees WHERE employeeId = ?"
-    )
-    .bind(employeeId)
-    .first();
-
-  if (!user) return jsonResponse({ message: "Không tìm thấy dữ liệu!" }, 404, origin);
-  return jsonResponse(user, 200, origin);
-}
-
-// Hàm đăng ký nhân viên
-async function handleRegister(body, db, origin) {
-  const { employeeId, fullName, storeName, password, phone, email, position, joinDate, pstatus } = body;
-  if (!employeeId || !fullName || !storeName || !password) {
-    return jsonResponse({ message: "Dữ liệu không hợp lệ!" }, 400, origin);
-  }
-
-  const existingUser = await db
-    .prepare("SELECT employeeId FROM employees WHERE employeeId = ?")
-    .bind(employeeId)
-    .first();
-  if (existingUser) return jsonResponse({ message: "Mã nhân viên đã tồn tại!" }, 209, origin);
-
-  const existingPhone = await db
-    .prepare("SELECT employeeId FROM employees WHERE phone = ?")
-    .bind(phone)
-    .first();
-  if (existingPhone) return jsonResponse({ message: "Số điện thoại đã tồn tại!" }, 210, origin);
-
-  const existingEmail = await db
-    .prepare("SELECT employeeId FROM employees WHERE email = ?")
-    .bind(email)
-    .first();
-  if (existingEmail) return jsonResponse({ message: "Email đã tồn tại!" }, 211, origin);
-
-  const { hash, salt } = await hashPasswordPBKDF2(password);
-  await db
-    .prepare(
-      "INSERT INTO queue (employeeId, password, salt, fullName, storeName, position, joinDate, phone, email, createdAt, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)"
-    )
-    .bind(
-      employeeId,
-      Array.from(hash).join(","),
-      Array.from(salt).join(","),
-      fullName,
-      storeName,
-      position || "NV",
-      joinDate || null,
-      phone || null,
-      email || null,
-      pstatus || "Wait"
-    )
-    .run();
-
-  return jsonResponse({ message: "Yêu cầu của bạn đã được gửi" }, 200, origin);
-}
-
-// Hàm cập nhật thông tin nhân viên
-async function handleUpdate(body, db, origin) {
-  const { employeeId, fullName, storeName, position, phone, email, joinDate } = body;
-  if (!employeeId || !fullName || !storeName) {
-    return jsonResponse({ message: "Dữ liệu không hợp lệ!" }, 400, origin);
-  }
-
-  const updated = await db
-    .prepare(
-      "UPDATE employees SET fullName = ?, storeName = ?, position = ?, phone = ?, email = ?, joinDate = ? WHERE employeeId = ?"
-    )
-    .bind(fullName, storeName, position || "NV", phone || null, email || null, joinDate || null, employeeId)
-    .run();
-
-  if (updated.meta.changes === 0) {
-    return jsonResponse({ message: "Cập nhật thất bại, mã nhân viên không tồn tại!" }, 404, origin);
-  }
-  return jsonResponse({ message: "Cập nhật thành công!" }, 200, origin);
-}
-
-// Hàm mã hóa mật khẩu (dành cho nhân viên) sử dụng PBKDF2
-async function hashPasswordPBKDF2(password, salt = crypto.getRandomValues(new Uint8Array(16))) {
+// Password hashing utility
+async function hashPassword(password) {
   const encoder = new TextEncoder();
-  const passwordBuffer = encoder.encode(password);
-
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    passwordBuffer,
-    "PBKDF2",
-    false,
-    ["deriveBits", "deriveKey"]
-  );
-
-  const hashBuffer = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-    keyMaterial,
-    256
-  );
-
-  return { hash: new Uint8Array(hashBuffer), salt };
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Hàm xác minh mật khẩu (dành cho nhân viên)
-async function verifyPassword(storedHash, storedSalt, password) {
-  const { hash } = await hashPasswordPBKDF2(password, storedSalt);
-  return storedHash.length === hash.length && storedHash.every((byte, index) => byte === hash[index]);
+// Generate random ID
+function generateId() {
+  return crypto.randomUUID();
 }
+
+// Generate URL-friendly slug
+function generateSlug(title) {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Remove duplicate hyphens
+    .trim('-'); // Remove leading/trailing hyphens
+}
+
+// JWT-like token generation for auth
+function generateAuthToken() {
+  return crypto.randomUUID() + '.' + btoa(Date.now().toString());
+}
+
+// Authentication middleware
+async function authenticate(request, env) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { error: 'Missing or invalid authorization header', status: 401 };
+  }
+
+  const token = authHeader.substring(7);
+  
+  try {
+    // Query user by token
+    const stmt = env.DB.prepare('SELECT u.* FROM users u JOIN user_sessions s ON u.id = s.user_id WHERE s.token = ? AND s.expires_at > ?');
+    const user = await stmt.bind(token, new Date().toISOString()).first();
+    
+    if (!user) {
+      return { error: 'Invalid or expired token', status: 401 };
+    }
+    
+    return { user };
+  } catch (error) {
+    return { error: 'Authentication failed', status: 500 };
+  }
+}
+
+// Check admin privileges
+function requireAdmin(user) {
+  if (user.role !== 'admin') {
+    return { error: 'Admin access required', status: 403 };
+  }
+  return null;
+}
+
+// Check support privileges  
+function requireSupport(user) {
+  if (!['admin', 'support'].includes(user.role)) {
+    return { error: 'Support access required', status: 403 };
+  }
+  return null;
+}
+
+// AUTH ENDPOINTS
+
+// Register new user
+async function handleRegister(request, env, origin) {
+  try {
+    const { name, email, password } = await request.json();
+    
+    if (!name || !email || !password) {
+      return jsonResponse({ error: 'Name, email and password are required' }, 400, origin);
+    }
+
+    const hashedPassword = await hashPassword(password);
+    const userId = generateId();
+    
+    // Check if user exists
+    const existingUser = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+    if (existingUser) {
+      return jsonResponse({ error: 'User already exists' }, 409, origin);
+    }
+    
+    // Create user
+    await env.DB.prepare(`
+      INSERT INTO users (id, name, email, password, role, balance, can_sell, created_at)
+      VALUES (?, ?, ?, ?, 'user', 0, 0, ?)
+    `).bind(userId, name, email, hashedPassword, new Date().toISOString()).run();
+    
+    const user = await env.DB.prepare('SELECT id, name, email, role, balance, can_sell FROM users WHERE id = ?').bind(userId).first();
+    
+    return jsonResponse({ message: 'User registered successfully', user }, 201, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Registration failed', details: error.message }, 500, origin);
+  }
+}
+
+// Login user
+async function handleLogin(request, env, origin) {
+  try {
+    const { email, password } = await request.json();
+    
+    if (!email || !password) {
+      return jsonResponse({ error: 'Email and password are required' }, 400, origin);
+    }
+
+    const hashedPassword = await hashPassword(password);
+    const user = await env.DB.prepare('SELECT * FROM users WHERE email = ? AND password = ?').bind(email, hashedPassword).first();
+    
+    if (!user) {
+      return jsonResponse({ error: 'Invalid credentials' }, 401, origin);
+    }
+    
+    // Create session
+    const token = generateAuthToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+    
+    await env.DB.prepare(`
+      INSERT OR REPLACE INTO user_sessions (user_id, token, expires_at)
+      VALUES (?, ?, ?)
+    `).bind(user.id, token, expiresAt.toISOString()).run();
+    
+    const userResponse = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      balance: user.balance,
+      canSell: user.can_sell
+    };
+    
+    return jsonResponse({ message: 'Login successful', user: userResponse, token }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Login failed', details: error.message }, 500, origin);
+  }
+}
+
+// Get user profile
+async function handleProfile(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  const userResponse = {
+    id: auth.user.id,
+    name: auth.user.name,
+    email: auth.user.email,
+    role: auth.user.role,
+    balance: auth.user.balance,
+    canSell: auth.user.can_sell
+  };
+  
+  return jsonResponse({ user: userResponse }, 200, origin);
+}
+
+// Logout user
+async function handleLogout(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  const authHeader = request.headers.get('Authorization');
+  const token = authHeader.substring(7);
+  
+  await env.DB.prepare('DELETE FROM user_sessions WHERE token = ?').bind(token).run();
+  
+  return jsonResponse({ message: 'Logged out successfully' }, 200, origin);
+}
+
+// PETS ENDPOINTS
+
+// Get all pets with filters
+async function handleGetPets(request, env, origin) {
+  try {
+    const url = new URL(request.url);
+    const limit = parseInt(url.searchParams.get('limit')) || 20;
+    const offset = parseInt(url.searchParams.get('offset')) || 0;
+    const category = url.searchParams.get('category');
+    const minPrice = url.searchParams.get('minPrice');
+    const maxPrice = url.searchParams.get('maxPrice');
+    const search = url.searchParams.get('search');
+    
+    let query = `
+      SELECT p.*, u.name as seller_name 
+      FROM pets p 
+      JOIN users u ON p.seller_id = u.id 
+      WHERE p.status = 'approved'
+    `;
+    let params = [];
+    
+    if (category) {
+      query += ' AND p.category = ?';
+      params.push(category);
+    }
+    
+    if (minPrice) {
+      query += ' AND p.price >= ?';
+      params.push(parseFloat(minPrice));
+    }
+    
+    if (maxPrice) {
+      query += ' AND p.price <= ?';
+      params.push(parseFloat(maxPrice));
+    }
+    
+    if (search) {
+      query += ' AND (p.name LIKE ? OR p.description LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    
+    query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    
+    const pets = await env.DB.prepare(query).bind(...params).all();
+    
+    return jsonResponse({ pets: pets.results || [] }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to fetch pets', details: error.message }, 500, origin);
+  }
+}
+
+// Get single pet by ID
+async function handleGetPetById(request, env, origin) {
+  try {
+    const url = new URL(request.url);
+    const petId = url.pathname.split('/').pop();
+    
+    const pet = await env.DB.prepare(`
+      SELECT p.*, u.name as seller_name, u.email as seller_email
+      FROM pets p 
+      JOIN users u ON p.seller_id = u.id 
+      WHERE p.id = ? AND p.status = 'approved'
+    `).bind(petId).first();
+    
+    if (!pet) {
+      return jsonResponse({ error: 'Pet not found' }, 404, origin);
+    }
+    
+    return jsonResponse({ pet }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to fetch pet', details: error.message }, 500, origin);
+  }
+}
+
+// Create new pet listing
+async function handleCreatePet(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  if (!auth.user.can_sell) {
+    return jsonResponse({ error: 'User not enabled for selling' }, 403, origin);
+  }
+  
+  try {
+    const petData = await request.json();
+    const { name, description, category, price, age, breed, images } = petData;
+    
+    if (!name || !description || !category || !price) {
+      return jsonResponse({ error: 'Required fields missing' }, 400, origin);
+    }
+    
+    // Check user balance for posting fee
+    if (auth.user.balance < 0.5) {
+      return jsonResponse({ error: 'Insufficient balance. $0.50 required for posting.' }, 402, origin);
+    }
+    
+    const petId = generateId();
+    const slug = generateSlug(name);
+    
+    // Deduct posting fee
+    await env.DB.prepare('UPDATE users SET balance = balance - 0.5 WHERE id = ?').bind(auth.user.id).run();
+    
+    // Create pet listing
+    await env.DB.prepare(`
+      INSERT INTO pets (id, seller_id, name, description, category, price, age, breed, images, slug, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+    `).bind(petId, auth.user.id, name, description, category, parseFloat(price), age, breed, JSON.stringify(images || []), slug, new Date().toISOString()).run();
+    
+    const pet = await env.DB.prepare('SELECT * FROM pets WHERE id = ?').bind(petId).first();
+    
+    return jsonResponse({ message: 'Pet listing created successfully', pet }, 201, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to create pet listing', details: error.message }, 500, origin);
+  }
+}
+
+// Search pets
+async function handleSearchPets(request, env, origin) {
+  try {
+    const url = new URL(request.url);
+    const query = url.searchParams.get('query') || '';
+    const limit = parseInt(url.searchParams.get('limit')) || 20;
+    
+    const pets = await env.DB.prepare(`
+      SELECT p.*, u.name as seller_name 
+      FROM pets p 
+      JOIN users u ON p.seller_id = u.id 
+      WHERE p.status = 'approved' 
+      AND (p.name LIKE ? OR p.description LIKE ? OR p.category LIKE ? OR p.breed LIKE ?)
+      ORDER BY p.created_at DESC 
+      LIMIT ?
+    `).bind(`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`, limit).all();
+    
+    return jsonResponse({ pets: pets.results || [] }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Search failed', details: error.message }, 500, origin);
+  }
+}
+
+// USER ENDPOINTS
+
+// Update user profile
+async function handleUpdateProfile(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const { name, email } = await request.json();
+    
+    await env.DB.prepare('UPDATE users SET name = ?, email = ? WHERE id = ?').bind(name, email, auth.user.id).run();
+    
+    const user = await env.DB.prepare('SELECT id, name, email, role, balance, can_sell FROM users WHERE id = ?').bind(auth.user.id).first();
+    
+    return jsonResponse({ message: 'Profile updated successfully', user }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to update profile', details: error.message }, 500, origin);
+  }
+}
+
+// Enable selling for user
+async function handleEnableSelling(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    await env.DB.prepare('UPDATE users SET can_sell = 1 WHERE id = ?').bind(auth.user.id).run();
+    
+    return jsonResponse({ message: 'Selling enabled successfully' }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to enable selling', details: error.message }, 500, origin);
+  }
+}
+
+// Top up user balance
+async function handleTopup(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const { amount, paymentMethod } = await request.json();
+    
+    if (!amount || amount <= 0) {
+      return jsonResponse({ error: 'Invalid amount' }, 400, origin);
+    }
+    
+    // In real implementation, integrate with payment processor
+    // For demo, we'll just add the amount
+    await env.DB.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').bind(parseFloat(amount), auth.user.id).run();
+    
+    const user = await env.DB.prepare('SELECT balance FROM users WHERE id = ?').bind(auth.user.id).first();
+    
+    return jsonResponse({ message: 'Balance topped up successfully', newBalance: user.balance }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Topup failed', details: error.message }, 500, origin);
+  }
+}
+
+// SELLER ENDPOINTS
+
+// Get seller stats
+async function handleSellerStats(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const stats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_listings,
+        COUNT(CASE WHEN status = 'approved' THEN 1 END) as active_listings,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_listings,
+        COALESCE(SUM(price), 0) as total_value
+      FROM pets 
+      WHERE seller_id = ?
+    `).bind(auth.user.id).first();
+    
+    return jsonResponse({ stats }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to fetch stats', details: error.message }, 500, origin);
+  }
+}
+
+// Get seller listings
+async function handleSellerListings(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const pets = await env.DB.prepare(`
+      SELECT * FROM pets 
+      WHERE seller_id = ? 
+      ORDER BY created_at DESC
+    `).bind(auth.user.id).all();
+    
+    return jsonResponse({ listings: pets.results || [] }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to fetch listings', details: error.message }, 500, origin);
+  }
+}
+
+// CART ENDPOINTS
+
+// Get cart items
+async function handleGetCart(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const items = await env.DB.prepare(`
+      SELECT c.*, p.name, p.price, p.images, p.category, u.name as seller_name
+      FROM cart_items c
+      JOIN pets p ON c.pet_id = p.id
+      JOIN users u ON p.seller_id = u.id
+      WHERE c.user_id = ?
+    `).bind(auth.user.id).all();
+    
+    return jsonResponse({ items: items.results || [] }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to fetch cart', details: error.message }, 500, origin);
+  }
+}
+
+// Add item to cart
+async function handleAddToCart(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const { petId } = await request.json();
+    
+    // Check if pet exists and is available
+    const pet = await env.DB.prepare('SELECT * FROM pets WHERE id = ? AND status = "approved"').bind(petId).first();
+    if (!pet) {
+      return jsonResponse({ error: 'Pet not found or not available' }, 404, origin);
+    }
+    
+    // Check if already in cart
+    const existing = await env.DB.prepare('SELECT * FROM cart_items WHERE user_id = ? AND pet_id = ?').bind(auth.user.id, petId).first();
+    if (existing) {
+      return jsonResponse({ error: 'Pet already in cart' }, 409, origin);
+    }
+    
+    await env.DB.prepare(`
+      INSERT INTO cart_items (user_id, pet_id, created_at)
+      VALUES (?, ?, ?)
+    `).bind(auth.user.id, petId, new Date().toISOString()).run();
+    
+    return jsonResponse({ message: 'Pet added to cart successfully' }, 201, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to add to cart', details: error.message }, 500, origin);
+  }
+}
+
+// Remove item from cart
+async function handleRemoveFromCart(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const url = new URL(request.url);
+    const petId = url.pathname.split('/').pop();
+    
+    await env.DB.prepare('DELETE FROM cart_items WHERE user_id = ? AND pet_id = ?').bind(auth.user.id, petId).run();
+    
+    return jsonResponse({ message: 'Pet removed from cart successfully' }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to remove from cart', details: error.message }, 500, origin);
+  }
+}
+
+// FAVORITES ENDPOINTS
+
+// Get favorites
+async function handleGetFavorites(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const favorites = await env.DB.prepare(`
+      SELECT f.*, p.name, p.price, p.images, p.category, u.name as seller_name
+      FROM favorites f
+      JOIN pets p ON f.pet_id = p.id
+      JOIN users u ON p.seller_id = u.id
+      WHERE f.user_id = ?
+    `).bind(auth.user.id).all();
+    
+    return jsonResponse({ favorites: favorites.results || [] }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to fetch favorites', details: error.message }, 500, origin);
+  }
+}
+
+// Add to favorites
+async function handleAddToFavorites(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const { petId } = await request.json();
+    
+    // Check if already favorited
+    const existing = await env.DB.prepare('SELECT * FROM favorites WHERE user_id = ? AND pet_id = ?').bind(auth.user.id, petId).first();
+    if (existing) {
+      return jsonResponse({ error: 'Pet already in favorites' }, 409, origin);
+    }
+    
+    await env.DB.prepare(`
+      INSERT INTO favorites (user_id, pet_id, created_at)
+      VALUES (?, ?, ?)
+    `).bind(auth.user.id, petId, new Date().toISOString()).run();
+    
+    return jsonResponse({ message: 'Pet added to favorites successfully' }, 201, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to add to favorites', details: error.message }, 500, origin);
+  }
+}
+
+// Remove from favorites
+async function handleRemoveFromFavorites(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const url = new URL(request.url);
+    const petId = url.pathname.split('/').pop();
+    
+    await env.DB.prepare('DELETE FROM favorites WHERE user_id = ? AND pet_id = ?').bind(auth.user.id, petId).run();
+    
+    return jsonResponse({ message: 'Pet removed from favorites successfully' }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to remove from favorites', details: error.message }, 500, origin);
+  }
+}
+
+// ADMIN ENDPOINTS
+
+// Get admin stats
+async function handleAdminStats(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  const adminError = requireAdmin(auth.user);
+  if (adminError) {
+    return jsonResponse(adminError, adminError.status, origin);
+  }
+  
+  try {
+    const stats = await env.DB.prepare(`
+      SELECT 
+        (SELECT COUNT(*) FROM users) as total_users,
+        (SELECT COUNT(*) FROM pets) as total_pets,
+        (SELECT COUNT(*) FROM pets WHERE status = 'pending') as pending_pets,
+        (SELECT COUNT(*) FROM pets WHERE status = 'approved') as approved_pets,
+        (SELECT COALESCE(SUM(balance), 0) FROM users) as total_user_balance
+    `).first();
+    
+    return jsonResponse({ stats }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to fetch admin stats', details: error.message }, 500, origin);
+  }
+}
+
+// Get pending pets for approval
+async function handleGetPendingPets(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  const adminError = requireAdmin(auth.user);
+  if (adminError) {
+    return jsonResponse(adminError, adminError.status, origin);
+  }
+  
+  try {
+    const pets = await env.DB.prepare(`
+      SELECT p.*, u.name as seller_name, u.email as seller_email
+      FROM pets p
+      JOIN users u ON p.seller_id = u.id
+      WHERE p.status = 'pending'
+      ORDER BY p.created_at ASC
+    `).all();
+    
+    return jsonResponse({ pets: pets.results || [] }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to fetch pending pets', details: error.message }, 500, origin);
+  }
+}
+
+// Approve pet listing
+async function handleApprovePet(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  const adminError = requireAdmin(auth.user);
+  if (adminError) {
+    return jsonResponse(adminError, adminError.status, origin);
+  }
+  
+  try {
+    const url = new URL(request.url);
+    const petId = url.pathname.split('/')[3]; // /admin/pets/{id}/approve
+    
+    await env.DB.prepare('UPDATE pets SET status = "approved", approved_at = ? WHERE id = ?').bind(new Date().toISOString(), petId).run();
+    
+    return jsonResponse({ message: 'Pet approved successfully' }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to approve pet', details: error.message }, 500, origin);
+  }
+}
+
+// FILES ENDPOINTS
+
+// Get upload URL for file
+async function handleGetUploadUrl(request, env, origin) {
+  const auth = await authenticate(request, env);
+  if (auth.error) {
+    return jsonResponse({ error: auth.error }, auth.status, origin);
+  }
+  
+  try {
+    const { fileName, fileType } = await request.json();
+    
+    const key = `uploads/${auth.user.id}/${generateId()}-${fileName}`;
+    
+    // Generate presigned URL for R2 bucket (if available)
+    if (env.BUCKET) {
+      const url = await env.BUCKET.presignedUrl(key, {
+        method: 'PUT',
+        expires: 3600, // 1 hour
+        headers: {
+          'Content-Type': fileType
+        }
+      });
+      
+      return jsonResponse({ uploadUrl: url, key }, 200, origin);
+    }
+    
+    // Fallback for basic implementation
+    return jsonResponse({ 
+      uploadUrl: `https://api.example.com/upload/${key}`,
+      key 
+    }, 200, origin);
+  } catch (error) {
+    return jsonResponse({ error: 'Failed to generate upload URL', details: error.message }, 500, origin);
+  }
+}
+
+// MAIN ROUTER
 
 export default {
-  async scheduled(event, env, ctx) {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (today.getDay() !== 1) {
-        console.log(`Today is ${today.toLocaleDateString("en-US", { weekday: "long" })}. No action required.`);
-        return;
-      }
-
-      console.log("It's Monday! Clearing workSchedules...");
-      const deleteResult = await env.D1_BINDING.prepare("DELETE FROM workSchedules").run();
-      console.log(`Deleted ${deleteResult.meta.changes} rows from workSchedules.`);
-    } catch (error) {
-      console.error("Error in scheduled worker:", error);
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const origin = request.headers.get('Origin');
+    
+    // Handle preflight requests
+    if (request.method === 'OPTIONS') {
+      return handleCorsPreflightRequest(origin);
     }
-  },
-
-  async fetch(request, env) {
-    const db = env.D1_BINDING;
-    if (request.method === "OPTIONS") return handleOptionsRequest();
-
+    
     try {
-      const url = new URL(request.url);
-      const action = url.searchParams.get("action");
-      let token = url.searchParams.get("token");
-
-      // Kiểm tra token từ header Authorization nếu không có trong query
-      const authHeader = request.headers.get("Authorization");
-      if (!token && authHeader && authHeader.startsWith("Bearer ")) {
-        token = authHeader.split(" ")[1];
+      // Route requests
+      const path = url.pathname;
+      const method = request.method;
+      
+      // Auth routes
+      if (path === '/auth/register' && method === 'POST') {
+        return await handleRegister(request, env, origin);
       }
-
-      if (!action) return jsonResponse({ message: "Thiếu action trong query parameters!" }, 400);
-
-      const protectedActions = [
-        "update", "savedk", "checkdk", "getUser", "getUsers", 
-        "saveOrder", "updateOrderStatus", "getOrders", "cancelOrder", 
-        "getOrderById", "updateUser", "adjustUserExp"
-      ];
-      if (protectedActions.includes(action)) {
-        const session = await checkSessionMiddleware(token, db, ALLOWED_ORIGIN);
-        if (session instanceof Response) return session;
-        request.userId = session.employeeId;
+      if (path === '/auth/login' && method === 'POST') {
+        return await handleLogin(request, env, origin);
       }
-
-      if (request.method === "POST") {
-        const contentType = request.headers.get("Content-Type") || "";
-        if (!contentType.includes("application/json")) {
-          return jsonResponse({ message: "Invalid Content-Type" }, 400);
-        }
-
-        const body = await request.json();
-        switch (action) {
-          case "sendMessage":
-            return await handleSaveChat(body, db, ALLOWED_ORIGIN);
-          case "login":
-            return await handleLogin(body, db, ALLOWED_ORIGIN);
-          case "register":
-            return await handleRegister(body, db, ALLOWED_ORIGIN);
-          case "update":
-            return await handleUpdate(body, db, ALLOWED_ORIGIN);
-          case "savedk":
-            return await handleSaveSchedule(body, db, ALLOWED_ORIGIN);
-          case "saveTransaction":
-            return await handleSaveTransaction(body, db, ALLOWED_ORIGIN);
-          case "savePayment":
-            return await handleSavePayment(body, db, ALLOWED_ORIGIN);
-          case "registerUser":
-            return await registerUser(body, db, ALLOWED_ORIGIN);
-          case "loginUser":
-            return await loginUser(body, db, ALLOWED_ORIGIN);
-          case "saveOrder":
-            return await saveOrder(body, request.userId, db, ALLOWED_ORIGIN);
-          case "updateUser":
-            return await updateUser(body, request.userId, db, ALLOWED_ORIGIN);
-          case "adjustUserExp":
-            return await adjustUserExp(body, db, ALLOWED_ORIGIN);
-          default:
-            return jsonResponse({ message: "Action không hợp lệ!" }, 400);
-        }
+      if (path === '/auth/profile' && method === 'GET') {
+        return await handleProfile(request, env, origin);
       }
-
-      if (request.method === "GET") {
-        switch (action) {
-          case "getStores":
-            return await handleGetStores(db, ALLOWED_ORIGIN);
-          case "getMessages":
-            return await handleGetChat(url, db, ALLOWED_ORIGIN);
-          case "checkId":
-            return await handleCheckId(url, db, ALLOWED_ORIGIN);
-          case "getTransaction":
-            return await handleGetTransaction(url, db, ALLOWED_ORIGIN);
-          case "getUser":
-            return await handleGetUser(url, db, ALLOWED_ORIGIN);
-          case "getUsers":
-            return await handleGetUsers(url, db, ALLOWED_ORIGIN);
-          case "checkdk":
-            return await handleCheckSchedule(url, db, ALLOWED_ORIGIN);
-          case "User":
-            return await getUser(url, db, ALLOWED_ORIGIN);
-          case "updateOrderStatus":
-            return await updateOrderStatus(url, db, ALLOWED_ORIGIN);
-          case "getOrders":
-            return await getOrders(url, db, ALLOWED_ORIGIN);
-          case "cancelOrder":
-            return await cancelOrder(url, db, ALLOWED_ORIGIN);
-          case "getOrderById":
-            return await getOrderById(url, db, ALLOWED_ORIGIN);
-          case "checkTransaction":
-            const transactionId = url.searchParams.get("transactionId");
-            if (!transactionId) return jsonResponse({ message: "Thiếu transactionId!" }, 400);
-            const result = await checkTransactionStatus(transactionId, db);
-            return jsonResponse(result, result.success !== undefined ? 200 : 500);
-          default:
-            return jsonResponse({ message: "Action không hợp lệ!" }, 400);
-        }
+      if (path === '/auth/logout' && method === 'POST') {
+        return await handleLogout(request, env, origin);
       }
-
-      return jsonResponse({ message: "Phương thức không được hỗ trợ!" }, 405);
+      
+      // Pets routes
+      if (path === '/pets' && method === 'GET') {
+        return await handleGetPets(request, env, origin);
+      }
+      if (path === '/pets' && method === 'POST') {
+        return await handleCreatePet(request, env, origin);
+      }
+      if (path.startsWith('/pets/') && method === 'GET' && path !== '/pets/search') {
+        return await handleGetPetById(request, env, origin);
+      }
+      if (path === '/pets/search' && method === 'GET') {
+        return await handleSearchPets(request, env, origin);
+      }
+      
+      // User routes
+      if (path === '/users/profile' && method === 'PUT') {
+        return await handleUpdateProfile(request, env, origin);
+      }
+      if (path === '/users/enable-selling' && method === 'POST') {
+        return await handleEnableSelling(request, env, origin);
+      }
+      if (path === '/users/topup' && method === 'POST') {
+        return await handleTopup(request, env, origin);
+      }
+      
+      // Seller routes
+      if (path === '/seller/stats' && method === 'GET') {
+        return await handleSellerStats(request, env, origin);
+      }
+      if (path === '/seller/listings' && method === 'GET') {
+        return await handleSellerListings(request, env, origin);
+      }
+      
+      // Cart routes
+      if (path === '/cart' && method === 'GET') {
+        return await handleGetCart(request, env, origin);
+      }
+      if (path === '/cart/items' && method === 'POST') {
+        return await handleAddToCart(request, env, origin);
+      }
+      if (path.startsWith('/cart/items/') && method === 'DELETE') {
+        return await handleRemoveFromCart(request, env, origin);
+      }
+      
+      // Favorites routes
+      if (path === '/favorites' && method === 'GET') {
+        return await handleGetFavorites(request, env, origin);
+      }
+      if (path === '/favorites' && method === 'POST') {
+        return await handleAddToFavorites(request, env, origin);
+      }
+      if (path.startsWith('/favorites/') && method === 'DELETE') {
+        return await handleRemoveFromFavorites(request, env, origin);
+      }
+      
+      // Admin routes
+      if (path === '/admin/stats' && method === 'GET') {
+        return await handleAdminStats(request, env, origin);
+      }
+      if (path === '/admin/pets/pending' && method === 'GET') {
+        return await handleGetPendingPets(request, env, origin);
+      }
+      if (path.match(/^\/admin\/pets\/[^\/]+\/approve$/) && method === 'POST') {
+        return await handleApprovePet(request, env, origin);
+      }
+      
+      // Files routes
+      if (path === '/files/upload-url' && method === 'POST') {
+        return await handleGetUploadUrl(request, env, origin);
+      }
+      
+      // Health check
+      if (path === '/health' || path === '/') {
+        return jsonResponse({ 
+          status: 'ok', 
+          message: 'Pet Marketplace API is running',
+          timestamp: new Date().toISOString()
+        }, 200, origin);
+      }
+      
+      // Route not found
+      return jsonResponse({ error: 'Route not found' }, 404, origin);
+      
     } catch (error) {
-      console.error("Lỗi xử lý yêu cầu:", error);
-      return jsonResponse({ message: "Lỗi xử lý yêu cầu!", error: error.message }, 500);
+      console.error('Worker error:', error);
+      return jsonResponse({ 
+        error: 'Internal server error', 
+        details: error.message 
+      }, 500, origin);
     }
-  },
+  }
 };
