@@ -7,7 +7,7 @@ import { storage, sessionStorage } from './utils.js';
 
 // Configuration
 const CONFIG = {
-  BASE_URL: 'https://your-worker.your-subdomain.workers.dev', // Production URL
+  BASE_URL: 'https://hipet-market-api.tocotoco.workers.dev', // Production URL
   TIMEOUT: 30000, // 30 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second

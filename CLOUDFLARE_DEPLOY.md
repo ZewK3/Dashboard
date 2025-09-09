@@ -158,8 +158,8 @@ Root directory: /
 ### 5.4 Environment Variables cho Pages
 Trong **"Environment variables"**, thêm:
 ```
-API_BASE_URL = https://pet-market-api.your-account.workers.dev
-VITE_API_URL = https://pet-market-api.your-account.workers.dev
+API_BASE_URL = https://hipet-market-api.tocotoco.workers.dev
+VITE_API_URL = https://hipet-market-api.tocotoco.workers.dev
 ```
 
 ### 5.5 Deploy
@@ -182,7 +182,7 @@ Content: pet-market-frontend.pages.dev
 
 Type: CNAME
 Name: api
-Content: pet-market-api.your-account.workers.dev
+Content: hipet-market-api.tocotoco.workers.dev
 
 Type: CNAME  
 Name: cdn
@@ -192,7 +192,7 @@ Content: pet-images.r2.dev
 ### 6.2 Nếu dùng subdomain Cloudflare
 Có thể dùng URLs mặc định:
 - Frontend: `https://pet-market-frontend.pages.dev`
-- API: `https://pet-market-api.your-account.workers.dev`
+- API: `https://hipet-market-api.tocotoco.workers.dev`
 
 ## 🧪 BƯỚC 7: Kiểm Tra Deployment
 

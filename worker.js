@@ -108,6 +108,16 @@ const generateId = () => {
     .join('');
 };
 
+const generateSlug = (title) => {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+};
+
 const hashPassword = async (password) => {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -399,7 +409,7 @@ router.post('/api/auth/register', async (request, env) => {
     await env.PET_DB.prepare(`
       INSERT INTO users (id, fullName, email, phone, passwordHash, role, status, canSell, balance)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(userId, fullName, email, phone || null, passwordHash, role, 'active', canSell, balance).run();
+    `).bind(userId, fullName, email, phone || null, passwordHash, role, 'active', canSell.toString(), balance.toString()).run();
 
     // Create session
     const sessionId = generateId();
@@ -635,7 +645,7 @@ router.post('/api/users/topup', async (request, env) => {
     // Update user balance
     await env.PET_DB.prepare(`
       UPDATE users SET balance = balance + ? WHERE id = ?
-    `).bind(amountCents, user.id).run();
+    `).bind(amountCents.toString(), user.id).run();
 
     // Log audit trail
     await logAudit(env, user.id, 'user_topup', 'user', user.id, 
@@ -701,12 +711,12 @@ router.get('/api/pets', async (request, env) => {
 
     if (priceMin > 0) {
       whereConditions.push('price >= ?');
-      params.push(priceMin);
+      params.push(priceMin.toString());
     }
 
     if (priceMax < 999999999) {
       whereConditions.push('price <= ?');
-      params.push(priceMax);
+      params.push(priceMax.toString());
     }
 
     const whereClause = whereConditions.join(' AND ');
@@ -962,7 +972,7 @@ router.post('/api/pets', async (request, env) => {
     if (user.role !== 'admin') {
       await env.PET_DB.prepare(`
         UPDATE users SET balance = balance - ? WHERE id = ?
-      `).bind(postingFee, user.id).run();
+      `).bind(postingFee.toString(), user.id).run();
 
       // Log posting fee deduction
       await logAudit(env, user.id, 'posting_fee_deducted', 'user', user.id, 
@@ -1430,14 +1440,14 @@ router.post('/api/cart', async (request, env) => {
       // Update quantity
       await env.PET_DB.prepare(`
         UPDATE cart_items SET quantity = quantity + ? WHERE id = ?
-      `).bind(quantity, existingItem.id).run();
+      `).bind(quantity.toString(), existingItem.id).run();
     } else {
       // Add new item
       const itemId = generateId();
       await env.PET_DB.prepare(`
         INSERT INTO cart_items (id, cartId, petId, quantity, price)
         VALUES (?, ?, ?, ?, ?)
-      `).bind(itemId, cart.id, petId, quantity, pet.price).run();
+      `).bind(itemId, cart.id, petId, quantity.toString(), pet.price.toString()).run();
     }
 
     return new Response(JSON.stringify({ 
